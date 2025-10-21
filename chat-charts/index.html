@@ -752,8 +752,8 @@
 					});
 				} else collapse_button = data_spec.ui.collapse_button.div;
 
-				div.appendChild(collapse_button);
 				dataviz_panel.appendChild(div);
+				div.appendChild(collapse_button);
 			}
 
 			function collapse_dataviz(data_spec) {
@@ -766,12 +766,15 @@
 				var restore_chip = data_spec.ui.restore_chip.div;
 
 				div.removeChild(collapse_button);
-				div.appendChild(expand_button);
 				div.classList.remove("expanded");
 
 				dataviz_panel.removeChild(div);
 				chat_panel.insertBefore(div, restore_chip);
 				chat_panel.removeChild(restore_chip);
+
+				div.appendChild(expand_button);
+				div.scrollLeft = 0;
+				expand_button.style.right = data_spec.ui.expand_button.initial_position + "px";
 			}
 
 			function draw_chat_panel() {
@@ -818,7 +821,7 @@
 
 				add_chat_text(
 					"Do you think this UX is good enough for the chat panel to be the primary location for charts and tables?"
-					+ " Can dataviz in the chat panel be individual components with specialized UI?"
+					+ " Would dataviz elements in the chat panel be individual components with specialized UI?"
 				);
 			}
 
