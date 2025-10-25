@@ -3,7 +3,7 @@
 
 	<head>
 	    <meta charset="utf-8">
-		<title>Latest demo - Charts & tables for narrow chat panels</title>
+		<title>Previous demo - Charts & tables for narrow chat panels</title>
 
 		<script>
 			var initial_map_view = {
@@ -230,18 +230,6 @@
 				},
 			};
 
-			var maximize_spec = {
-				max_zoom: 1.7,
-				margin: {
-					x: 40,
-					y: 80,
-				},
-				min: {
-					width: 100,
-					height: 100,
-				},
-			};
-
 			function format_time(time) {
 
 				var h = Number(time.substring(0,2));
@@ -260,12 +248,6 @@
 				else s += "\u2009PM";
 
 				return s;
-			}
-
-			function set_scaleable_size(svg, width, height) {
-				svg.setAttribute("viewBox", "0 0 " + width + " " + height);
-				svg.setAttribute("width", width);
-				svg.setAttribute("height", height);
 			}
 
  			function get_timeseries_chart(data_spec) {
@@ -294,11 +276,8 @@
 					});
 				}
 
-				set_scaleable_size(
-					svg,
-					data_spec.grid.width + timeseries_spec.padding.left + timeseries_spec.padding.right,
-					timeseries_spec.grid.height + timeseries_spec.padding.top + timeseries_spec.padding.bottom
-				);
+				svg.setAttribute("width", data_spec.grid.width + timeseries_spec.padding.left + timeseries_spec.padding.right);
+				svg.setAttribute("height", timeseries_spec.grid.height + timeseries_spec.padding.top + timeseries_spec.padding.bottom);
 
 				svg.appendChild(grid);
 				svg.appendChild(curve);
@@ -442,11 +421,8 @@
 				var labels = document.createElementNS(svg.namespaceURI, "g");
 				var line, text, circle, sx, sy, x, y, i;
 
-				set_scaleable_size(
-					svg,
-					scatter_spec.grid.width + scatter_spec.padding.left + scatter_spec.padding.right + data_spec.extra_width,
-					scatter_spec.grid.height + scatter_spec.padding.top + scatter_spec.padding.bottom
-				);
+				svg.setAttribute("width", scatter_spec.grid.width + scatter_spec.padding.left + scatter_spec.padding.right + data_spec.extra_width);
+				svg.setAttribute("height", scatter_spec.grid.height + scatter_spec.padding.top + scatter_spec.padding.bottom);
 
 				svg.appendChild(grid);
 				svg.appendChild(dots);
@@ -621,7 +597,7 @@
 				return table;
 			}
 
-			// Assume (1) path is sorted by time, (2) there is at least one time point per day and (3) duration is less than 2 months
+			// Assume path is sorted by time, there is at least time point per day and duration is less than 2 month
 			function get_timeseries_from_path(path) {
 
 				var timeseries = new Array();
@@ -687,132 +663,120 @@
 
 			function add_chat_text(text) {
 
-				var panel = document.getElementById("chat");
+				var panel = document.getElementById("chat-panel");
 				var div = document.createElement("div");
 
 				div.classList.add("text");
 				div.textContent = text;
 				panel.appendChild(div);
-	
+
 				return div;
 			}
 
-			function add_maximize_button(div, data_spec) {
+			function add_expand_button(div, data_spec) {
 
 				var button = document.createElement("div");
-				button.classList.add("maximize-button");
+				button.classList.add("expand-button");
 				div.appendChild(button);
 
 				data_spec.ui = {
 					div: div,
-					button: {
+					expand_button: {
 						div: button,
 						initial_position: window.getComputedStyle(button).getPropertyValue("right").split("px")[0],
+					},
+					collapse_button: {
+						div: null,
+					},
+					restore_chip: {
+						div: null,
 					},
 				};
 
 				div.addEventListener("scroll", function() {
-					button.style.right = (data_spec.ui.button.initial_position - div.scrollLeft) + "px";
+					button.style.right = (data_spec.ui.expand_button.initial_position - div.scrollLeft) + "px";
 				});
 
 				button.addEventListener("click", function() {
-					maximize_dataviz(data_spec);
+					expand_dataviz(data_spec);
 				});
 			}
 
-			function add_chat_dataviz(data_spec, dataviz_method) {
+			function add_chat_table(div, data_spec) {
 
-				var panel = document.getElementById("chat");
-				var div;
-
-				data_spec.dataviz_method = dataviz_method;
-
-				if (dataviz_method == get_table) {
-
-					div = dataviz_method(data_spec);
-
-				} else {
-
-					div = document.createElement("div");
-					div.classList.add("chart");
-					div.appendChild(dataviz_method(data_spec));
-				}
+				var panel = document.getElementById("chat-panel");
 
 				panel.appendChild(div);
-				add_maximize_button(div, data_spec);
+				add_expand_button(div, data_spec);
 			}
 
-			function maximize_chart(svg) {
+			function add_chat_chart(svg, data_spec) {
 
-				var popup = document.getElementById("popup");
-				var max = {
-					width: Math.max(popup.clientWidth - maximize_spec.margin.x * 2, maximize_spec.min.width),
-					height: Math.max(popup.clientHeight - maximize_spec.margin.y * 2, maximize_spec.min.height)
-				};
-				var view_box = svg.getAttribute("viewBox").split(" ");
-				var unzoomed = {
-					width: view_box[2],
-					height: view_box[3]
-				};
-				var zoom = Math.min(Math.min(max.width / unzoomed.width, max.height / unzoomed.height), maximize_spec.max_zoom);
+				var panel = document.getElementById("chat-panel");
+				var div = document.createElement("div");
 
-				svg.setAttribute("width", zoom * unzoomed.width);
-				svg.setAttribute("height", zoom * unzoomed.height);
+				div.classList.add("chart");
+				div.appendChild(svg);
+				panel.appendChild(div);
+
+				add_expand_button(div, data_spec);
 			}
 
-			function re_maximize_chart() {
+			function expand_dataviz(data_spec) {
 
-				var div = document.getElementById("popup-content");
-				if (div == null) return;
+				var chat_panel = document.getElementById("chat-panel");
+				var dataviz_panel = document.getElementById("dataviz-panel");
+				var div = data_spec.ui.div;
+				var expand_button = data_spec.ui.expand_button.div;
+				var restore_chip;
+				var collapse_button;
 
-				var svg = div.querySelector("svg");
-				if (svg == null) return;
+				div.removeChild(expand_button);
+				div.classList.add("expanded");
 
-				maximize_chart(svg);
+				if (data_spec.ui.restore_chip.div == null) {
+					restore_chip = data_spec.ui.restore_chip.div = document.createElement("div");
+					restore_chip.classList.add("restore-chip");
+					restore_chip.textContent = data_spec.title;
+					restore_chip.addEventListener("click", function() {
+						collapse_dataviz(data_spec);
+					});
+				} else restore_chip = data_spec.ui.restore_chip.div;
+
+				chat_panel.insertBefore(restore_chip, div);
+				chat_panel.removeChild(div);
+
+				if (data_spec.ui.collapse_button.div == null) {
+					collapse_button = data_spec.ui.collapse_button.div = document.createElement("div");
+					collapse_button.classList.add("collapse-button");
+					collapse_button.addEventListener("click", function() {
+						collapse_dataviz(data_spec);
+					});
+				} else collapse_button = data_spec.ui.collapse_button.div;
+
+				dataviz_panel.appendChild(div);
+				div.appendChild(collapse_button);
 			}
 
-			function maximize_dataviz(data_spec) {
+			function collapse_dataviz(data_spec) {
 
-				var popup = document.getElementById("popup");
-				var div, svg;
+				var chat_panel = document.getElementById("chat-panel");
+				var dataviz_panel = document.getElementById("dataviz-panel");
+				var div = data_spec.ui.div;
+				var expand_button = data_spec.ui.expand_button.div;
+				var collapse_button = data_spec.ui.collapse_button.div;
+				var restore_chip = data_spec.ui.restore_chip.div;
 
-				popup.style.display = "flex";
+				div.removeChild(collapse_button);
+				div.classList.remove("expanded");
 
-				if (data_spec.dataviz_method == get_table) {
+				dataviz_panel.removeChild(div);
+				chat_panel.insertBefore(div, restore_chip);
+				chat_panel.removeChild(restore_chip);
 
-					div = data_spec.dataviz_method(data_spec);
-
-				} else {
-
-					svg = data_spec.dataviz_method(data_spec);
-					maximize_chart(svg);
-
-					div = document.createElement("div");
-					div.classList.add("chart");
-					div.appendChild(svg);
-				}
-
-				div.id = "popup-content";
-				div.classList.add("maximize");
-				popup.appendChild(div);
-			}
-
-			function close_popup() {
-
-				var div = document.getElementById("popup-content");
-				var popup = document.getElementById("popup");
-
-				popup.removeChild(div);
-				popup.style.display = "none";
-			}
-
-			function toggle_panel_width() {
-
-				var panel = document.getElementById("panel");
-				var is_wide = panel.classList.contains("wide");
-
-				if (is_wide) panel.classList.remove("wide");
-				else panel.classList.add("wide");
+				div.appendChild(expand_button);
+				div.scrollLeft = 0;
+				expand_button.style.right = data_spec.ui.expand_button.initial_position + "px";
 			}
 
 			function draw_chat_panel() {
@@ -821,29 +785,28 @@
 
 				add_chat_text(
 					"This is a demo of how charts might appear in the chat stream."
-					+ " The chat panel is a good place for dataviz to appear if it's compact enough."
-					+ " You might have to scroll some of the wider charts and tables to see everything or pop up a maximized view."
-					+ " You can also make the chat panel wider to make everything in the panel easier to see (but hiding more of the map)."
+					+ " It shows that the chat panel is a reasonable place for dataviz to initially appear if compact styling is applied."
+					+ " You can scroll individual charts and tables if they overflow the panel."
+					+ " You can also pop out charts and tables. Try the scrolling and popping interactions to see how it works."
 				);
 
 				hurricane_helene.timeseries = get_timeseries_from_path(hurricane_helene.path);
-				add_chat_dataviz(hurricane_helene, get_timeseries_chart);
+				add_chat_chart(get_timeseries_chart(hurricane_helene), hurricane_helene);
 
 				add_chat_text(
 					"The following table fits entirely within the chat panel."
-					+ " There's no need to scroll it."
+					+ " There's no need to scroll it and perhaps no need to pop it out."
 				);
 
-				add_chat_dataviz(hurricane_risk, get_table);
+				add_chat_table(get_table(hurricane_risk), hurricane_risk);
 
 				add_chat_text(
-					"The following table scrolls horizontally so you can see all the columns."
-					+ " Tables with lots of rows may be clipped and scroll vertically within themselves - that's awkward."
-					+ " The best UX for tables with lots of columns or lots of rows or both is when they're maximized."
-					
+					"The following table needs to scroll horizontally."
+					+ " Some tables may need to scroll vertically (not demonstrated here)."
+					+ " Best UX is probably to pop it out rather than scrolling within the chat panel."
 				);
 
-				add_chat_dataviz(socioeconomic_vulnerability, get_table);
+				add_chat_table(get_table(socioeconomic_vulnerability), socioeconomic_vulnerability);
 
 				add_chat_text(
 					"The following chart needs no scrolling."
@@ -851,30 +814,28 @@
 					+ " Are there other benefits to pinning charts outside of the chat?"
 				);
 
-				add_chat_dataviz(wind_unemployment, get_scatter_plot);
+				add_chat_chart(get_scatter_plot(wind_unemployment), wind_unemployment);
 
 				add_chat_text(
-					"The following chart might scroll if its title is too long."
+					"The following chart scrolls only because its title is long."
 					+ " That's a quirk of how it's implemented."
 				);
 
-				add_chat_dataviz(income_unemployment, get_scatter_plot);
+				add_chat_chart(get_scatter_plot(income_unemployment), income_unemployment);
 
 				add_chat_text(
-					"Design question: Is the chat panel the best place to read charts and tables? Hypothesis: Yes."
+					"Do you think this UX is good enough for the chat panel to be the primary location for charts and tables?"
+					+ " Would dataviz elements in the chat panel be individual components with specialized UI?"
 				);
 
 				div = add_chat_text(
-					"Note: In the previous version of this demo you could pop charts out of the panel and pin them to the map."
-					+ " Feedback indicated it was unnecessarily complicated so we tried something simpler in this version.\xa0"
+					"Note: Feedback for this demo indicated that it's more complicated than necessary so we followed up with something simpler.\xa0\xa0"
 				);
 				span = document.createElement("a");
-				span.textContent = "Look at the previous demo ...";
-				span.setAttribute("href", "chat-charts-popouts.html");
+				span.textContent = "Look at the latest demo ...";
+				span.setAttribute("href", "index.html");
 				span.setAttribute("target", "_blank");
 				div.appendChild(span);
-
-				window.addEventListener('resize', re_maximize_chart);
 			}
 
 			function draw_map() {
@@ -887,6 +848,7 @@
 					disableDefaultUI: true,
 				  	gestureHandling: "cooperative",
 					zoomControl: true,
+				    zoomControlOptions: { position: google.maps.ControlPosition.TOP_RIGHT },
 				});
 			}
 
@@ -913,25 +875,24 @@
 			body {
 				margin: 0px;
 				font-family: "Google Sans", Arial, sans-serif;
-				background-color: #dadce0;
 			}
 			.map {
 				width: 100vw;
 				height: 100vh;
 			}
-			.panel {
+			.left-panel {
 				position: absolute;
 				top: 18px;
 				left: 18px;
 				bottom: 18px;
 				width: 490px;
-				padding: 36px 2px 24px 24px;
+				padding: 24px 2px 24px 24px;
 				border-radius: 16px;
 				background-color: #131314;
 			    filter: drop-shadow(0px 4px 4px rgba(0, 0, 0, 0.35));
 				overflow: hidden;
 			}
-			.chat {
+			.chat-panel {
 				width: 100%;
 				height: 100%;
 				overflow-x: hidden;
@@ -994,10 +955,10 @@
 				text-align: right;
 			}
 			.table .rows div.last-col {
-				padding-right: 16px;
+				padding-right: 6px;
 			}
 			.table.five-columns .rows {
-				grid-template-columns: repeat(5, minmax(min-content, max-content));
+				grid-template-columns:  repeat(5, minmax(min-content, max-content));
 			}
 			.table.ten-columns .rows div.not-last-col {
 				padding-right: 8px;
@@ -1005,113 +966,111 @@
 			.table.ten-columns .rows {
 				grid-template-columns: repeat(10, minmax(min-content, max-content));
 			}
-			.maximize-button, .close-button {
+			.expand-button, .collapse-button {
 				position: absolute;
+				top: 6px;
+				right: 8px;
 				width: 36px;
 				height: 36px;
 				border-radius: 18px;
 			    pointer-events: auto;
 				cursor: pointer;
+			}
+			.expand-button {
+				background-color: rgba(51, 53, 55, 0.5);
 			    user-select: none;
 			}
-			.maximize-button {
-				top: 6px;
-				right: 8px;
-				background-color: rgba(51, 53, 55, 0.5);
-			}
-			.maximize-button::before {
+			.expand-button::before {
 			    content: url("data:image/svg+xml; utf8, <svg width='24' height='24' xmlns='http://www.w3.org/2000/svg'><path d='M3 21V13H5V17.6L17.6 5H13V3H21V11H19V6.4L6.4 19H11V21H3Z' fill='white' fill-opacity='0.8'/></svg>");
 				position: relative;
 				top: 6px;
 				left: 6px;
 			}
-			.maximize-button:hover {
+			.expand-button:hover {
 				background-color: rgba(0, 0, 0, 0.7);
 			}
-			.popup {
-				display: none;
-				position: fixed;
-				top: 0;
-				left: 0;
-				width: 100vw;
-				height: 100vh;
-			    align-items: center;
-			    justify-content: center;
+			.restore-chip {
+				position: relative;
+				max-width: 400px;
+				overflow: hidden;
+				padding: 2px 16px 9px 26px;
+				margin: 0 0 24px 0;
+				border: 1px solid rgba(255, 255, 255, 0.08);
+				border-radius: 36px;
+				font-weight: 400;
+				font-size: 14px;
+				line-height: 20px;
+			    white-space: nowrap;
+			    text-overflow: ellipsis;
+				color: #ffffff;
+				background-color: #333537;
+			    user-select: none;
+			    pointer-events: auto;
+				cursor: pointer;
+			}
+			.restore-chip::before {
+			    content: url("data:image/svg+xml; utf8, <svg width='24' height='24' xmlns='http://www.w3.org/2000/svg'><path fill-rule='evenodd' clip-rule='evenodd' d='M12 4C14.43 4.00001 16.6504 4.67963 18.6504 6.04004C20.6503 7.39957 22.1 9.21988 23 11.5C22.1 13.7796 20.6502 15.6 18.6504 16.96C16.6504 18.32 14.43 19 12 19C9.57 19 7.34961 18.32 5.34961 16.96C3.34976 15.6 1.89996 13.7796 1 11.5C1.89995 9.31997 3.42363 7.45085 5.34961 6.04004C7.27582 4.62915 9.57 3.99999 12 4ZM12 6C10.1199 6.00003 8.38551 6.50027 6.80957 7.49023C5.23982 8.48018 4.02993 9.82003 3.2002 11.5C4.02993 13.1797 5.23977 14.5198 6.80957 15.5098C8.38952 16.4997 10.1199 17 12 17C13.8798 17 15.6104 16.4998 17.1904 15.5098C18.7602 14.5198 19.9699 13.1797 20.7998 11.5C19.9699 9.82006 18.7602 8.48016 17.1904 7.49023C15.6104 6.50023 13.8798 6 12 6Z' fill='white' fill-opacity='0.8'/><path fill-rule='evenodd' clip-rule='evenodd' d='M12 7C14.4853 7 16.5 9.01472 16.5 11.5C16.5 13.9853 14.4853 16 12 16C9.51472 16 7.5 13.9853 7.5 11.5C7.5 9.01472 9.51472 7 12 7ZM12 8.7998C10.5088 8.7998 9.2998 10.0088 9.2998 11.5C9.29991 12.9911 10.5089 14.2002 12 14.2002C13.491 14.2001 14.7001 12.991 14.7002 11.5C14.7002 10.0089 13.4911 8.79991 12 8.7998Z' fill='white' fill-opacity='0.8'/></svg>");
+				position: relative;
+				top: 8px;
+				left: -10px;
+			}
+			.restore-chip:hover {
+				background-color: rgba(255, 255, 255, 0.2);
+			}
+			.right-panel {
+				position: absolute;
+				top: 100px;
+				right: 8px;
+				bottom: 18px;
+				padding: 0;
+				overflow: hidden;
+				display: flex;
+				flex-direction: column;
+				justify-content: flex-end;
+  			}
+			.dataviz-panel {
+				margin: 0;
+				padding: 0 8px 0 0;
+				flex-direction: column;
+				justify-content: flex-end;
+				overflow-y: auto;
+				scrollbar-width: thin;
+			    scrollbar-color: rgba(0, 0, 0, 0.5) rgba(255, 255, 255, 0.5);
+			}
+			.table.expanded, .chart.expanded {
+				max-width: none;
+				min-height: max-content;
+				margin: 16px 0 0 auto;
+				padding: 20px 24px;
+				border-radius: 16px;
 				background-color: #131314;
+			    filter: drop-shadow(0px 4px 4px rgba(0, 0, 0, 0.35));
+ 			}
+			.table.expanded:first-child, .chart.expanded:first-child {
+				margin-top: 0;
 			}
-			.close-button {
-				top: 12px;
-				right: 12px;
+			.collapse-button {
+				background-color: rgba(19, 19, 20, 0.5);
 			}
-			.close-button::before {
-			    content: url("data:image/svg+xml; utf8, <svg width='24' height='24' xmlns='http://www.w3.org/2000/svg'><path d='M5 6.4L6.4 5L12 10.6L17.6 5L19 6.4L13.4 12L19 17.6L17.6 19L12 13.4L6.4 19L5 17.6L10.6 12L5 6.4Z' fill='white' fill-opacity='1'/></svg>");
+			.collapse-button::before {
+			    content: url("data:image/svg+xml; utf8, <svg width='24' height='24' xmlns='http://www.w3.org/2000/svg'><path d='M5 6.4L6.4 5L12 10.6L17.6 5L19 6.4L13.4 12L19 17.6L17.6 19L12 13.4L6.4 19L5 17.6L10.6 12L5 6.4Z' fill='white' fill-opacity='0.8'/></svg>");
 				position: relative;
 				top: 6px;
 				left: 6px;
 			}
-			.close-button:hover {
+			.collapse-button:hover {
 				background-color: rgba(255, 255, 255, 0.2);
-			}
-			.table.maximize, .chart.maximize {
-				max-width: none;
-				background-color: transparent;
-			    user-select: text;
- 			}
-			.table.maximize {
-				font-size: 16px;
-				line-height: 22px;
-			}
-			.table.maximize .rows div {
-				padding-top: 8px;
-				padding-bottom: 8px;
-				padding-left: 16px;
-			}
-			.wide-toggle {
-				position: absolute;
-				width: 60px;
-				height: 40px;
-				border-radius: 6px;
-			    pointer-events: auto;
-				cursor: pointer;
-			    user-select: none;
-				top: 8px;
-				right: 12px;
-			}
-			.wide-toggle::before {
-				content: url("data:image/svg+xml; utf8, <svg width='32' height='32' fill='white' fill-opacity='0.75' xmlns='http://www.w3.org/2000/svg'><path d='M0 16L9 7V25L0 16Z'/><path d='M23 25V7L32 16L23 25Z'/></svg>");
-				position: relative;
-				top: 4px;
-				left: 14px;
-			}
-			.panel.wide .wide-toggle::before {
-				content: url("data:image/svg+xml; utf8, <svg width='32' height='32' fill='white' fill-opacity='0.75' xmlns='http://www.w3.org/2000/svg'><path d='M4 7L13 16L4 25V7Z'/><path d='M28 25L19 16L28 7V25Z'/></svg>");
-			}
-			.wide-toggle:hover {
-				background-color: rgba(255, 255, 255, 0.2);
-			}
-			.panel.wide {
-				width: 700px;
-			}
-			.panel.wide .chat .text, .panel.wide .chat .text a {
-				font-size: 16px;
-				line-height: 22px;
-				padding: 2px 24px 20px 20px;
-			}
-			.panel.wide .chat .table, .panel.wide .chat .chart {
-				max-width: 648px;
-				margin: 0 auto 24px auto;
 			}
 		</style>
 	</head>
 
 	<body onload="initialize()">
 		<div class="map" id="map"></div>
-		<div class="panel" id="panel">
-			<div class="wide-toggle" onclick="toggle_panel_width()"></div>
-			<div class="chat" id="chat"></div>
+		<div class="left-panel">
+			<div class="chat-panel" id="chat-panel"></div>
 		</div>
-		<div class="popup" id="popup">
-			<div class="close-button" onclick="close_popup()"></div>
+		<div class="right-panel">
+			<div class="dataviz-panel" id="dataviz-panel"></div>
 		</div>
 	</body>
 
