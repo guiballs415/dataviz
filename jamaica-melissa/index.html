@@ -510,7 +510,6 @@
 					div = document.createElement("div");
 					color_div.appendChild(div);
 					div.style.background = colors[i];
-					div.style.opacity = map_spec.shape.style.fillOpacity;
 
 					div = document.createElement("div");
 					ticks_div.appendChild(div);
@@ -601,12 +600,6 @@
 		<link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
 
 		<style>
-			:root {
-				box-sizing: border-box;
-			}
-			* {
-				box-sizing: inherit;
-			}
 			body {
 				margin: 0px;
 				font-family: "Roboto", Arial, sans-serif;
@@ -662,18 +655,16 @@
 				line-height: 22px;
 			}
 			.legend .colors {
-				height: 24px;
-				width: max-content;
 				margin: 4px 0 2px 0;
 				border: 1px solid #dadce0;
+				border-radius: 4px;
+				opacity: 0.7;
+				height: 24px;
 			}
 			.legend .colors div {
 				display: inline-block;
 				width: 72px;
 				height: 24px;
-			}
-			.legend .ticks {
-				margin-left: 0;
 			}
 			.legend .ticks div {
 				display: inline-block;
