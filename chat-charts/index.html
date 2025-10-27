@@ -822,8 +822,8 @@
 				add_chat_text(
 					"This is a demo of how charts might appear in the chat stream."
 					+ " The chat panel is a good place for dataviz to appear if it's compact enough."
-					+ " You might have to scroll some of the wider charts and tables to see everything or pop up a maximized view."
-					+ " You can also make the chat panel wider to make everything in the panel easier to see (but hiding more of the map)."
+					+ " But you might have to scroll some of the wider charts and tables or pop up a maximized view to see everything."
+					+ " You can make the chat panel wider so that there's more room for everything but it hides more of the map."
 				);
 
 				hurricane_helene.timeseries = get_timeseries_from_path(hurricane_helene.path);
@@ -866,10 +866,10 @@
 
 				div = add_chat_text(
 					"Note: In the previous version of this demo you could pop charts out of the panel and pin them to the map."
-					+ " Feedback indicated it was unnecessarily complicated so we tried something simpler in this version.\xa0"
+					+ " Feedback indicated it was unnecessarily complicated so we tried something simpler here. "
 				);
 				span = document.createElement("a");
-				span.textContent = "Look at the previous demo ...";
+				span.textContent = "Look at previous demo";
 				span.setAttribute("href", "chat-charts-popouts.html");
 				span.setAttribute("target", "_blank");
 				div.appendChild(span);
@@ -913,7 +913,6 @@
 			body {
 				margin: 0px;
 				font-family: "Google Sans", Arial, sans-serif;
-				background-color: #dadce0;
 			}
 			.map {
 				width: 100vw;
@@ -1091,10 +1090,13 @@
 			}
 			.panel.wide {
 				width: 700px;
+				top: 8px;
+				left: 8px;
+				bottom: 8px;
 			}
 			.panel.wide .chat .text, .panel.wide .chat .text a {
 				font-size: 16px;
-				line-height: 22px;
+				line-height: 24px;
 				padding: 2px 24px 20px 20px;
 			}
 			.panel.wide .chat .table, .panel.wide .chat .chart {
