@@ -1,0 +1,699 @@
+<!doctype html>
+<html lang="en">
+
+	<head>
+	    <meta charset="utf-8">
+		<title>Hurricane Melissa approaching Jamaica (Oct 25 forecast) </title>
+
+		<script src="data/hurricane-beryl.js"></script>
+		<script src="data/hurricane-melissa-forecast.js"></script>
+
+		<script>
+			var map_spec = {
+
+				view: {
+					center: { lat: 17.8, lng: -77.5 },
+					zoom: 8,
+					bounds: {
+						southwest: { lat: 16.5, lng: -80.0 }, 
+						northeast: { lat: 18.5, lng: -75.0 }
+					},
+				},
+
+				path: {
+					color: {
+						beryl: "#8ab4f8", // Blue 300
+						melissa: "#a142f4", // Purple 500
+					},
+					width: 4,
+				},
+
+				hurricane_center: null,
+
+				shape: {
+
+					wind_max: null,
+					wind_34: null,
+					wind_50: null,
+					wind_64: null,
+
+					color: {
+						wind_max: "#a142f4", // Purple 500
+						wind_34: "#fbbc04", // Yellow 500
+						wind_50: "#e8710a", // Orange 600
+						wind_64: "#c5221f", // Red 700
+					},
+
+					style: {
+						fillOpacity: 0.5,
+						strokeOpacity: 0,
+						clickable: false,
+					},
+
+					z_index: 2,
+					steps: 100,
+				},
+	
+				beryl: {
+					label: "Hurricane Beryl\nJul 4, 2024",
+					day: "Jul 04",
+					time: "0100",
+					weekday_offset: {
+						day: "Jun 28",
+						weekday: "Fri",
+					},
+				},
+
+				mph_per_knot: 1.15078,
+			};
+
+			var time_spec = {
+
+				months: [ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" ],
+				weekdays: [ "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" ],
+
+				weekday_offset: {
+					day: "Oct 21",
+					weekday: "Tue",
+				},
+
+				timeseries: null, // Create when initialized
+
+				animation: {
+
+					speed: 6.0, // hours of cyclone per seconds of animation
+					start: 92, // hours
+					end: 188, // hours - if null then it'll be set to last time point in data
+
+					frame_rate: 25 / 1000, // frames per millisecond
+
+					timer: null,
+					t0: null,
+					h0: 0,
+					dh: 0,
+				},
+			};
+
+			function convert_google_time_to_nhc_day_and_time(cyclones) {
+
+				for (var i=0 ; i < cyclones.length ; i++) {
+
+					if (cyclones[i].t == null) {
+						cyclones[i].time = null;
+						cyclones[i].day = null;
+						continue;
+					}
+
+					var d = cyclones[i].t.split(" ")[0].split("-");
+					var t = cyclones[i].t.split(" ")[1].split(":");
+
+					cyclones[i].time = t[0] + t[1];
+					cyclones[i].day = time_spec.months[Number(d[1])-1] + " " + d[2];
+				}
+			}
+
+			function day_and_time_to_hours(day_and_time, path) {
+
+				var days = new Array();
+				var hr, min, h1, h2, n, i;
+
+				var hr = Number(path[0].time.substring(0, 2));
+				var min = Number(path[0].time.substring(2, 4));
+				h1 = hr + min / 60;
+
+				// Get days
+				for (d=null, i=0 ; i < path.length ; i++) {
+					if (path[i].day !== d) {
+						d = path[i].day;
+						days.push(d);
+					}
+				}
+	
+				// Count days
+				for (n=0 ; days[n] !== day_and_time.day ; n++) ;
+
+				hr = Number(day_and_time.time.substring(0, 2));
+				min = Number(day_and_time.time.substring(2, 4));
+				h2 = hr + min / 60 - h1 + n * 24;
+
+				return h2;
+			}
+
+			function hours_to_day_and_time(hours, timeseries, weekday_offset=null) {
+
+				var all_days = new Array();
+				var offset = Number(timeseries[0].data.time.substring(0, 2)) + Number(timeseries[0].data.time.substring(2, 4)) / 60;
+				var day, time, hr, min, num_days, weekday, i;
+
+				hours += offset;
+				num_days = Math.floor(hours / 24);
+
+				// Get day
+				for (day=null, i=0 ; i < timeseries.length ; i++) {
+					if (timeseries[i].data.day !== day) {
+						day = timeseries[i].data.day;
+						all_days.push(day);
+					}
+				}
+				day = all_days[num_days];
+
+				if (weekday_offset != null && all_days[0] === weekday_offset.day) {
+					for (i=0 ; time_spec.weekdays[i] !== weekday_offset.weekday ; i++) ;
+					weekday =  time_spec.weekdays[(i + num_days) % time_spec.weekdays.length];
+				} else weekday = "";
+
+				hr = hours - num_days * 24;
+				min = Math.round((hr - Math.floor(hr)) * 60);
+				hr = Math.floor(hr);
+				time = (hr < 10 ? "0" : "") + hr + (min < 10 ? "0" : "") + min;
+
+				return { day: day, time: time, weekday: weekday };
+			}
+
+			// Assume (1) path is sorted by time, (2) there is at least one time point per day and (3) duration is less than 2 months
+			function get_timeseries_from_path(path) {
+
+				var timeseries = new Array();
+
+				for (var i=0 ; i < path.length ; i++) {
+					timeseries.push({
+						hours: day_and_time_to_hours(path[i], path),
+						data: path[i],
+					});
+				}
+
+				return timeseries;
+			}
+
+			function get_valid_path(path) {
+
+				var filtered_path = new Array();
+				for (var i=0 ; i < path.length ; i++) {
+					var p = path[i];
+					if (p.lat != null && p.lng != null) filtered_path.push({ lat: p.lat, lng: p.lng });
+				}
+
+				return filtered_path;
+			}
+
+			function create_overlay(div, p_latLng, layer=1) {
+
+				class overlayElement extends google.maps.OverlayView {
+					constructor(div, p_latLng, layer, on_first_draw) {
+						super();
+						this.div = div;
+						this.location = p_latLng;
+						this.layer = layer;
+					}
+					onAdd() {
+						var panes = this.getPanes();
+						var thisPane = panes.floatPane;
+						if (this.layer == 2) thisPane = panes.markerLayer;
+						else if (this.layer == 3) thisPane = panes.overlayMouseTarget;
+						else thisPane = panes.overlayLayer;
+						thisPane.appendChild(this.div);
+					}
+					onRemove() {
+						if (this.div.parentElement) this.div.parentElement.removeChild(this.div);
+					}
+					draw() {
+						this.setDivPosition(this.location);
+					}
+					moveTo(p_latLng) {
+						this.setDivPosition(p_latLng);
+						this.location = p_latLng;
+					}
+					setDivPosition(p_latLng) {
+						const p = this.getProjection().fromLatLngToDivPixel(p_latLng);
+						this.div.style.left = p.x + "px";
+						this.div.style.top = p.y + "px";
+					}
+					isReadyToMove() {
+						return (this.getProjection() != undefined);
+					}
+				}
+
+				return new overlayElement(div, p_latLng, layer);
+			}
+
+			function create_hurricane_center(p, color, annotation="") {
+
+				var div = document.createElement("div");
+				var label = document.createElement("div");
+				var outer_pin = document.createElement("div");
+				var inner_pin = document.createElement("div");
+				var text = document.createTextNode(annotation);
+				var pin;
+
+				div.classList.add("hurricane-center");
+				label.classList.add("label");
+				outer_pin.classList.add("pin");
+				inner_pin.classList.add("color");
+
+				label.appendChild(text);
+				div.appendChild(label);
+
+				outer_pin.appendChild(inner_pin);
+				div.appendChild(outer_pin);
+
+				inner_pin.style.backgroundColor = color;
+				pin = create_overlay(div, p, 2);
+
+				return { pin: pin, text: text };
+			}
+
+			function beryl_annotation(map) {
+
+				var hours = day_and_time_to_hours(map_spec.beryl, hurricane_beryl);
+				var timeseries = get_timeseries_from_path(hurricane_beryl);
+				var data = get_data_on_path(hours, timeseries);
+				var center = create_hurricane_center(new google.maps.LatLng(data), map_spec.path.color.beryl, map_spec.beryl.label);
+
+				center.pin.setMap(map);
+			}
+
+			function interpolate(v1, v2, t) {
+				if (v2 == null) return v1;
+				else if (v1 == null) return v2;
+				else return t * (v2 - v1) + v1;
+			}
+
+			function get_data_on_path(hours, timeseries) {
+
+				var data, data1, data2, t, i;
+
+				for (i=0 ; i < timeseries.length && hours > timeseries[i].hours ; i++) ;
+
+				if (i == 0) data = timeseries[0].data;
+				else if (i == timeseries.length) data = timeseries[timeseries.length-1].data;
+				else {
+
+					// Interpolate
+					t = (hours - timeseries[i-1].hours) / (timeseries[i].hours - timeseries[i-1].hours);
+					data1 = timeseries[i-1].data;
+					data2 = timeseries[i].data;
+					data = {
+						lat:  interpolate(data1.lat, data2.lat, t),
+						lng:  interpolate(data1.lng, data2.lng, t),
+						wind_max:  interpolate(data1.wind_max, data2.wind_max, t),
+						r_wind_max:  interpolate(data1.r_wind_max, data2.r_wind_max, t),
+						r_ne_wind_34:  interpolate(data1.r_ne_wind_34, data2.r_ne_wind_34, t),
+						r_se_wind_34:  interpolate(data1.r_se_wind_34, data2.r_se_wind_34, t),
+						r_sw_wind_34:  interpolate(data1.r_sw_wind_34, data2.r_sw_wind_34, t),
+						r_nw_wind_34:  interpolate(data1.r_nw_wind_34, data2.r_nw_wind_34, t),
+						r_ne_wind_50:  interpolate(data1.r_ne_wind_50, data2.r_ne_wind_50, t),
+						r_se_wind_50:  interpolate(data1.r_se_wind_50, data2.r_se_wind_50, t),
+						r_sw_wind_50:  interpolate(data1.r_sw_wind_50, data2.r_sw_wind_50, t),
+						r_nw_wind_50:  interpolate(data1.r_nw_wind_50, data2.r_nw_wind_50, t),
+						r_ne_wind_64:  interpolate(data1.r_ne_wind_64, data2.r_ne_wind_64, t),
+						r_se_wind_64:  interpolate(data1.r_se_wind_64, data2.r_se_wind_64, t),
+						r_sw_wind_64:  interpolate(data1.r_sw_wind_64, data2.r_sw_wind_64, t),
+						r_nw_wind_64:  interpolate(data1.r_nw_wind_64, data2.r_nw_wind_64, t),
+					};
+				}
+
+				return data;
+			}
+
+			function draw_wind_shapes(data) {
+
+				var p = new google.maps.LatLng(data);
+				var r = new Array();
+				var colors = new Array();
+				var paths, r_ne, r_se, r_sw, r_nw, q, v, i, j, k;
+
+				for (i=0 ; i < 4 ; i++) {
+
+					if (i == 0) {
+						r_ne = r_se = r_sw = r_nw = data.r_wind_max;
+						colors.push(map_spec.shape.color.wind_max);
+					} else if (i == 1) {
+						r_ne = data.r_ne_wind_64;
+						r_se = data.r_se_wind_64;
+						r_sw = data.r_sw_wind_64;
+						r_nw = data.r_nw_wind_64;
+						colors.push(map_spec.shape.color.wind_64);
+					} else if (i == 2) {
+						r_ne = data.r_ne_wind_50;
+						r_se = data.r_se_wind_50;
+						r_sw = data.r_sw_wind_50;
+						r_nw = data.r_nw_wind_50;
+						colors.push(map_spec.shape.color.wind_50);
+					} else {
+						r_ne = data.r_ne_wind_34;
+						r_se = data.r_se_wind_34;
+						r_sw = data.r_sw_wind_34;
+						r_nw = data.r_nw_wind_34;
+						colors.push(map_spec.shape.color.wind_34);
+					}
+
+					if (r_ne == null || r_se == null || r_sw == null || r_nw == null) r[i] = null;
+					else {
+
+						v = new Array();
+						v.push(google.maps.geometry.spherical.computeOffset(p, r_ne * 1000, 45));
+						v.push(google.maps.geometry.spherical.computeOffset(p, r_se * 1000, 135));
+						v.push(google.maps.geometry.spherical.computeOffset(p, r_sw * 1000, -135));
+						v.push(google.maps.geometry.spherical.computeOffset(p, r_nw * 1000, -45));
+
+						r[i] = new Array();
+						for (j=0 ; j < map_spec.shape.steps ; j++) {
+							r[i].push(interpolate_loop(v, j / map_spec.shape.steps));
+						}
+					}
+				}
+
+				for (i=0 ; i < 4 ; i++) {
+
+					if (r[i] == null) polygon = null;
+					else {
+
+						// Edge
+						paths = new Array();
+						paths.push(r[i]);
+
+						// Hole
+						for (j=i-1 ; j >= 0 && r[j] == null ; j--) ;
+						if (j >= 0) {
+							q = new Array();
+							for (k=r[j].length-1 ; k >= 0 ; k--) q.push(r[j][k]);
+							paths.push(q);
+						}
+
+						polygon = new google.maps.Polygon({ paths:paths });
+						polygon.setOptions(map_spec.shape.style);
+						polygon.setOptions({
+							fillColor: colors[i],
+							zIndex: (map_spec.shape.z_index + 3 - i),
+						});
+						polygon.setMap(map_spec.map);
+					}
+
+					if (i == 0) {
+						if (map_spec.shape.wind_max != null) map_spec.shape.wind_max.setMap(null);
+						map_spec.shape.wind_max = polygon;
+					} else if (i == 1) {
+						if (map_spec.shape.wind_64 != null) map_spec.shape.wind_64.setMap(null);
+						map_spec.shape.wind_64 = polygon;
+					} else if (i == 2) {
+						if (map_spec.shape.wind_50 != null) map_spec.shape.wind_50.setMap(null);
+						map_spec.shape.wind_50 = polygon;
+					} else {
+						if (map_spec.shape.wind_34 != null) map_spec.shape.wind_34.setMap(null);
+						map_spec.shape.wind_34 = polygon;
+					}
+				}
+			}
+
+			function interpolate_loop(vertices, revolution) {
+
+				var i = Math.floor(revolution * vertices.length);
+				var t = revolution * vertices.length - i;
+				var p0 = vertices[(i + vertices.length - 1) % vertices.length];
+				var p1 = vertices[i];
+				var p2 = vertices[(i + 1) % vertices.length];
+				var p3 = vertices[(i + 2) % vertices.length];
+				var sqrt
+
+				var v1 = { lat: (p2.lat() - p0.lat()) / Math.SQRT2, lng: (p2.lng() - p0.lng()) / Math.SQRT2 };
+				var v2 = { lat: (p3.lat() - p1.lat()) / Math.SQRT2, lng: (p3.lng() - p1.lng()) / Math.SQRT2 };
+				var tt, ttt, lat, lng;
+
+				tt = t * t;
+				ttt = tt * t;
+				lat = (2 * p1.lat() + v1.lat - 2 * p2.lat() + v2.lat) * ttt + (-3 * p1.lat() + 3 * p2.lat() - 2 * v1.lat - v2.lat) * tt + v1.lat * t + p1.lat();
+				lng = (2 * p1.lng() + v1.lng - 2 * p2.lng() + v2.lng) * ttt + (-3 * p1.lng() + 3 * p2.lng() - 2 * v1.lng - v2.lng) * tt + v1.lng * t + p1.lng();
+
+				return  new google.maps.LatLng({ lat: lat, lng: lng });
+			}
+
+			function update_animation() {
+
+				var animation = time_spec.animation;
+				var t = new Date().getTime();
+				var dt = t - animation.t0;
+				var dh = animation.h0 + animation.speed * (dt / 1000);
+				var period = animation.end - animation.start;
+				var hours = animation.start + dh - Math.floor(dh / period) * period;
+				var data = get_data_on_path(hours, time_spec.timeseries);
+				var day_and_time = hours_to_day_and_time(hours, time_spec.timeseries, time_spec.weekday_offset);
+				var max_speed, annotation, h;
+
+				animation.dh = dh;
+
+				if (map_spec.hurricane_center.pin.isReadyToMove()) map_spec.hurricane_center.pin.moveTo(new google.maps.LatLng(data));
+
+				h = Number(day_and_time.time.substring(0,2));
+				if (h < 1) annotation = "12";
+				else if (h < 13) annotation = h;
+				else annotation = h - 12;
+				if (h < 12) annotation += " AM";
+				else annotation += " PM";
+				annotation += "  " + day_and_time.weekday + "\n" + day_and_time.day;
+
+				if (data.wind_max != null) {
+					max_speed = Math.round(data.wind_max * map_spec.mph_per_knot) + " mph";
+					annotation += "\n" + max_speed;
+					document.getElementById("max-speed").textContent = max_speed;
+				} else {
+					document.getElementById("max-speed").textContent = "max";
+				}
+
+				map_spec.hurricane_center.text.textContent = annotation;
+
+				draw_wind_shapes(data);
+			}
+
+			function toggle_animation() {
+
+				var animation = time_spec.animation;
+
+				if (animation.timer == null) {
+					animation.t0 = new Date().getTime();
+					update_animation();
+					animation.timer = setInterval(update_animation, 1.0 / time_spec.animation.frame_rate);
+					return;
+				}
+
+				clearInterval(animation.timer);
+				animation.h0 = animation.dh;
+				animation.timer = null;
+			}
+
+			function draw_legend() {
+
+				var colors = [
+					map_spec.shape.color.wind_34,
+					map_spec.shape.color.wind_50,
+					map_spec.shape.color.wind_64,
+					map_spec.shape.color.wind_max,
+				];
+				var ticks = [
+					Math.round(34 * map_spec.mph_per_knot) + "+ mph",
+					Math.round(50 * map_spec.mph_per_knot) + "+ mph",
+					Math.round(64 * map_spec.mph_per_knot) + "+ mph",
+					"Maximum"
+				];
+				var legend_div = document.getElementById("legend");
+				var color_div = document.createElement("div");
+				var ticks_div = document.createElement("div");
+				var div, i;
+
+				color_div.classList.add("colors");
+				ticks_div.classList.add("ticks");
+
+				legend_div.appendChild(color_div);
+				legend_div.appendChild(ticks_div);
+
+				for (i=0 ; i < colors.length ; i++) {
+
+					div = document.createElement("div");
+					color_div.appendChild(div);
+					div.style.background = colors[i];
+					div.style.opacity = map_spec.shape.style.fillOpacity;
+
+					div = document.createElement("div");
+					ticks_div.appendChild(div);
+					div.textContent = ticks[i];
+
+					if (i+1 == colors.length) div.id = "max-speed";
+				}
+			}
+
+			function draw_hurricanes(map) {
+
+				map.fitBounds(
+					new google.maps.LatLngBounds(
+						new google.maps.LatLng(map_spec.view.bounds.southwest),
+						new google.maps.LatLng(map_spec.view.bounds.northeast)
+					),
+					{ top: 0, right: 0, bottom: 0, left: 0 }
+				);
+
+				var beryl_path = new google.maps.Polyline({
+					path: get_valid_path(hurricane_beryl),
+					geodesic: true,
+					strokeColor: map_spec.path.color.beryl,
+					strokeOpacity: 1.0,
+					strokeWeight: map_spec.path.width,
+				});
+
+			    beryl_path.setMap(map);
+				beryl_annotation(map);
+
+				var predicted_melissa_path = new google.maps.Polyline({
+					path: get_valid_path(hurricane_melissa),
+					geodesic: true,
+					strokeColor: map_spec.path.color.melissa,
+					strokeOpacity: 1.0,
+					strokeWeight: map_spec.path.width,
+				});
+
+			    predicted_melissa_path.setMap(map);
+
+				convert_google_time_to_nhc_day_and_time(hurricane_melissa);
+				time_spec.timeseries = get_timeseries_from_path(hurricane_melissa);
+
+				if (time_spec.animation.end == null) {
+					time_spec.animation.end = time_spec.timeseries[time_spec.timeseries.length-1].hours;
+				}
+
+				map_spec.map = map;
+				map_spec.hurricane_center = create_hurricane_center(
+					new google.maps.LatLng(time_spec.timeseries[0].data),
+					map_spec.path.color.melissa
+				);
+				map_spec.hurricane_center.pin.setMap(map);
+
+				draw_legend();
+
+				toggle_animation();
+
+				window.addEventListener('click', toggle_animation);
+				map.addListener("zoom_changed", toggle_animation);
+			}
+
+			async function initialize() {
+
+				const { Map } = await google.maps.importLibrary("maps");
+				const { geometry } = await google.maps.importLibrary("geometry");
+
+				var div = document.getElementById("map");
+				var map = new google.maps.Map(div, {
+					center: map_spec.view.center,
+					zoom: map_spec.view.zoom,
+					mapTypeId: 'hybrid',
+					disableDefaultUI: true,
+					gestureHandling: "cooperative",
+					zoomControl: true,
+				});
+
+				draw_hurricanes(map);
+			}
+
+			// Bootstrap loader (Dynamic Library Import API)
+			(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+				key: "AIzaSyCqHHpYbRdkCj5_gWK6V51ZRuAK__gg1-8",
+    			v: "weekly",
+			});
+		</script>
+
+		<link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+
+		<style>
+			:root {
+				box-sizing: border-box;
+			}
+			* {
+				box-sizing: inherit;
+			}
+			body {
+				margin: 0px;
+				font-family: "Roboto", Arial, sans-serif;
+				font-size: 14px;
+			}
+			.map {
+				width: 100vw;
+				height: 100vh;
+   			}
+			.hurricane-center {
+				position: absolute;
+				left: 0;
+				top: 0;
+				transform: translate(-50%, -100%) translateY(14px);
+				padding: 2px 6px 6px 6px;
+				border-radius: 8px 8px 24px 24px;
+			}
+			.hurricane-center .label {
+				position: relative;
+				top: -4px;
+				font-family: "Roboto", Arial, sans-serif;
+				font-size: 14px;
+				line-height: 1 8px;
+				text-align: center;
+				color: white;
+			    filter: drop-shadow(0px 2px 2px rgba(0, 0, 0, 0.5));
+				white-space: pre-line;
+			}
+			.hurricane-center .pin {
+				margin: 0 auto;
+				width: 16px;
+				height: 16px;
+				border-radius: 8px;
+				background-color: white;
+			    filter: drop-shadow(0px 2px 2px rgba(0, 0, 0, 0.5));
+			}
+			.hurricane-center .color {
+				transform: translate(2px, 2px);
+				width: 12px;
+				height: 12px;
+				border-radius: 6px;
+			}
+			.card {
+				position: absolute;
+				top: 12px;
+				left: 16px;
+				padding: 10px 16px;
+				border-radius: 8px;
+				background-color: rgba(255, 255, 255, 0.85);
+			    filter: drop-shadow(0px 2px 2px rgba(0, 0, 0, 0.3));
+				color: #202124;
+				font-weight: 500;
+				line-height: 22px;
+			}
+			.legend .colors {
+				height: 24px;
+				width: max-content;
+				margin: 4px 0 2px 0;
+				border: 1px solid #dadce0;
+			}
+			.legend .colors div {
+				display: inline-block;
+				width: 72px;
+				height: 24px;
+			}
+			.legend .ticks {
+				margin-left: 0;
+			}
+			.legend .ticks div {
+				display: inline-block;
+				width: 72px;
+				text-align: center;
+				line-height: 14px;
+				white-space: no-wrap;
+			}
+			.gm-style-cc { display: none !important; }
+			.gm-style iframe + div { border:none !important; }
+		</style>
+	</head>
+
+	<body onload="initialize()">
+		<div class="map" id="map"></div>
+		<div class="card">
+			<div>Hurricane Melissa path & wind speeds</div>
+			<div>Oct 25, 2025 Experimental Cyclones Model</div>
+			<div class="legend" id="legend"></div>
+		</div>
+	</body>
+
+</html>
