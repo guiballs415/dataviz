@@ -821,9 +821,9 @@
 
 				add_chat_text(
 					"This is a demo of how charts might appear in the chat stream."
-					+ " The chat panel is a good place for dataviz to appear if it's compact enough."
-					+ " But you might have to scroll some of the wider charts and tables or pop up a maximized view to see everything."
-					+ " You can make the chat panel wider so that there's more room for everything but it hides more of the map."
+					+ " The chat panel is a good place for dataviz to appear if the content is compact enough."
+					+ " But you might have to scroll some of the wider charts and tables or pop them up to see them better."
+					+ " You might make the panel wider so that there's more room for everything but it hides more of the map."
 				);
 
 				hurricane_helene.timeseries = get_timeseries_from_path(hurricane_helene.path);
@@ -837,18 +837,18 @@
 				add_chat_dataviz(hurricane_risk, get_table);
 
 				add_chat_text(
-					"The following table scrolls horizontally so you can see all the columns."
-					+ " Tables with lots of rows may be clipped and scroll vertically within themselves - that's awkward."
-					+ " The best UX for tables with lots of columns or lots of rows or both is when they're maximized."
-					
+					"You might have to scroll the following table horizontally to see all its columns."
+					+ " Tables with lots of rows might also be clipped and scroll vertically - that's awkward."
+					+ " The best UX for tables with lots of columns or lots of rows is when they're popped up and maximized."
 				);
 
 				add_chat_dataviz(socioeconomic_vulnerability, get_table);
 
 				add_chat_text(
 					"The following chart needs no scrolling."
-					+ " Are there benefits to popping it out anyway? We might implement more spacious styles for popped out dataviz (not demonstrated here)."
-					+ " Are there other benefits to pinning charts outside of the chat?"
+					+ " Are there benefits to popping it up anyway?"
+					+ " We might implement more spacious styles for popped up dataviz as demonstrated here."
+					+ " Expanded full-bleed views are better for taking screenshots for slides too."
 				);
 
 				add_chat_dataviz(wind_unemployment, get_scatter_plot);
@@ -861,7 +861,9 @@
 				add_chat_dataviz(income_unemployment, get_scatter_plot);
 
 				add_chat_text(
-					"Design question: Is the chat panel the best place to read charts and tables? Hypothesis: Yes."
+					"Design question: Is the chat panel the best place to read charts and tables?"
+					+ " Hypothesis: Yes. It's helpful to see dataviz within the content of the chat Q&A."
+					+ " If the content is too large it can be expanded."
 				);
 
 				div = add_chat_text(
@@ -869,7 +871,7 @@
 					+ " Feedback indicated it was unnecessarily complicated so we tried something simpler here. "
 				);
 				span = document.createElement("a");
-				span.textContent = "Look at previous demo";
+				span.textContent = "See previous demo";
 				span.setAttribute("href", "chat-charts-popouts.html");
 				span.setAttribute("target", "_blank");
 				div.appendChild(span);
