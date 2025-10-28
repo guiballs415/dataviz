@@ -3,7 +3,7 @@
 
 	<head>
 	    <meta charset="utf-8">
-		<title>Hurricane Melissa approaching Jamaica (Oct 25 forecast) </title>
+		<title>Hurricane Melissa to Jamaica (Oct 25 forecast)</title>
 
 		<script src="data/hurricane-beryl.js"></script>
 		<script src="data/hurricane-melissa-forecast.js"></script>
@@ -77,15 +77,15 @@
 					weekday: "Tue",
 				},
 
-				timeseries: null, // Create when initialized
+				timeseries: null,
 
 				animation: {
 
-					speed: 6.0, // hours of cyclone per seconds of animation
-					start: 92, // hours
-					end: 188, // hours - if null then it'll be set to last time point in data
+					speed: 6.3, // hours of cyclone per seconds of animation
+					start: 72, // hours from first time point
+					end: 195, // hours from first time point - if null then last time point
 
-					frame_rate: 25 / 1000, // frames per millisecond
+					frame_rate: 25 / 1000, // fps - frames per millisecond
 
 					timer: null,
 					t0: null,
@@ -568,8 +568,10 @@
 
 				toggle_animation();
 
-				window.addEventListener('click', toggle_animation);
-				map.addListener("zoom_changed", toggle_animation);
+				// Doesn't work - Idea was to click to pause and run animation
+				// Pause is low priority - need to pause is specialized, e.g. screenshot
+				// window.addEventListener('click', toggle_animation);
+				// map.addListener("zoom_changed", toggle_animation);
 			}
 
 			async function initialize() {
@@ -681,7 +683,7 @@
 	<body onload="initialize()">
 		<div class="map" id="map"></div>
 		<div class="card">
-			<div>Hurricane Melissa path & wind speeds</div>
+			<div>Hurricane Melissa Path & Wind Speeds</div>
 			<div>Oct 25, 2025 Experimental Cyclones Model</div>
 			<div class="legend" id="legend"></div>
 		</div>
