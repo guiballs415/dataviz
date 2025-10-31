@@ -837,9 +837,9 @@
 				add_chat_dataviz(hurricane_risk, get_table);
 
 				add_chat_text(
-					"You might have to scroll the following table horizontally to see all its columns."
+					"You might need to scroll the following table to see all its columns."
 					+ " Tables with lots of rows might also be clipped and scroll vertically - that's awkward."
-					+ " The best UX for tables with lots of columns or lots of rows is when they're popped up and maximized."
+					+ " The best UX for tables with lots of columns or rows is when they're expanded."
 				);
 
 				add_chat_dataviz(socioeconomic_vulnerability, get_table);
@@ -848,7 +848,7 @@
 					"The following chart needs no scrolling."
 					+ " Are there benefits to popping it up anyway?"
 					+ " We might implement more spacious styles for popped up dataviz as demonstrated here."
-					+ " Expanded full-bleed views are better for taking screenshots for slides too."
+					+ " Expanded full-bleed views are better for taking screenshots to share or document."
 				);
 
 				add_chat_dataviz(wind_unemployment, get_scatter_plot);
@@ -862,7 +862,10 @@
 
 				add_chat_text(
 					"Design question: Is the chat panel the best place to read charts and tables?"
-					+ " Hypothesis: Yes. It's helpful to see dataviz within the content of the chat Q&A."
+				);
+
+				add_chat_text(
+					" Hypothesis: Yes. It's helpful to see dataviz within the content of the chat Q&A."
 					+ " If the content is too large it can be expanded."
 				);
 
@@ -887,7 +890,6 @@
 					zoom: initial_map_view.zoom,
 					mapTypeId: 'hybrid',
 					disableDefaultUI: true,
-				  	gestureHandling: "cooperative",
 					zoomControl: true,
 				});
 			}
@@ -904,7 +906,9 @@
     			v: "weekly",
 			});
 		</script>
-			
+
+		<link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500|Roboto:100italic" rel="stylesheet">
+
 		<style>
 			:root {
 				box-sizing: border-box;
@@ -1069,7 +1073,7 @@
 			}
 			.wide-toggle {
 				position: absolute;
-				width: 60px;
+				width: 48px;
 				height: 40px;
 				border-radius: 6px;
 			    pointer-events: auto;
@@ -1079,31 +1083,42 @@
 				right: 12px;
 			}
 			.wide-toggle::before {
-				content: url("data:image/svg+xml; utf8, <svg width='32' height='32' fill='white' fill-opacity='0.75' xmlns='http://www.w3.org/2000/svg'><path d='M0 16L9 7V25L0 16Z'/><path d='M23 25V7L32 16L23 25Z'/></svg>");
+				content: url("data:image/svg+xml; utf8, <svg width='32' height='32' fill='white' fill-opacity='0.75' xmlns='http://www.w3.org/2000/svg'><path d='M11 27V5L22 16L11 27Z'/></svg>");
 				position: relative;
 				top: 4px;
-				left: 14px;
+				left: 10px;
 			}
 			.panel.wide .wide-toggle::before {
-				content: url("data:image/svg+xml; utf8, <svg width='32' height='32' fill='white' fill-opacity='0.75' xmlns='http://www.w3.org/2000/svg'><path d='M4 7L13 16L4 25V7Z'/><path d='M28 25L19 16L28 7V25Z'/></svg>");
+				content: url("data:image/svg+xml; utf8, <svg width='32' height='32' fill='white' fill-opacity='0.75' xmlns='http://www.w3.org/2000/svg'><path d='M20 27L9 16L20 5V27Z'/></svg>");
+				left: 9px;
 			}
 			.wide-toggle:hover {
 				background-color: rgba(255, 255, 255, 0.2);
 			}
 			.panel.wide {
-				width: 700px;
+				width: max(720px, 54vw);
 				top: 8px;
 				left: 8px;
 				bottom: 8px;
 			}
-			.panel.wide .chat .text, .panel.wide .chat .text a {
-				font-size: 16px;
-				line-height: 24px;
-				padding: 2px 24px 20px 20px;
+			.panel.wide .chat .text {
+				max-width: 680px;
+				margin: 0 auto;
 			}
 			.panel.wide .chat .table, .panel.wide .chat .chart {
-				max-width: 648px;
-				margin: 0 auto 24px auto;
+				max-width: 100%;
+				margin: 4px auto 24px auto;
+			}
+			.panel.wide .chat .chart, .panel.wide .chat .table, .panel.wide .chat .text, .panel.wide .chat .text a {
+				font-family: "Roboto", Arial, sans-serif;
+			}
+			.panel.wide .chat .text, .panel.wide .chat .text a {
+				font-size: 16px;
+				font-weight: 300;
+				line-height: 24px;
+			}
+			.panel.wide .chat .table, .panel.wide .chat .table .title, .panel.wide .chat .table .rows .header {
+				font-weight: 300;
 			}
 		</style>
 	</head>
