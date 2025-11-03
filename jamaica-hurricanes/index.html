@@ -18,6 +18,8 @@
 					southwest: { lat: 16.5, lng: -80.0 }, 
 					northeast: { lat: 18.5, lng: -75.0 }
 				},
+
+				hurricanes: new Array(),
 			};
 
 			var hurricane_spec = {
@@ -32,12 +34,12 @@
 				},
 
 				opacity: {
-					wind_max: 0.65,
-					wind_34: 0.50,
+					wind_34: 0.25,
 					wind_50: 0.55,
 					wind_64: 0.60,
+					wind_max: 0.60,
 				},
-				num_colors: 4,
+				num_wind_buckets: 4,
 
 				z_index: 2,
 
@@ -46,6 +48,8 @@
 				// Chaikin's corner cutting iterations
 				// https://www.cs.unc.edu/~dm/UNC/COMP258/LECTURES/Chaikins-Algorithm.pdf
 				loop_refinement_steps: 6,
+
+				wind_tunnel_step: 3, // hours
 			};
 
 			var time_spec = {
@@ -59,8 +63,6 @@
 					t0: null,
 					h0: 0,
 					dh: 0,
-
-					hurricanes: new Array(),
 				},
 
 				months: [ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" ],
@@ -84,16 +86,21 @@
 
 				z_index: null,
 
-				box: null,
+				// Graphical elements
+				path: null,
 				center: null,
-				wind_max: null,
-				wind_34: null,
-				wind_50: null,
-				wind_64: null,
+				polygons: {
+					wind_area: [ null, null, null, null ],
+					wind_tunnel: [ null, null, null, null ],
+				},
 
 				animation: {
 					start: 100, // hours from first time point
 					end: 144, // hours from first time point - if null then last time point
+				},
+				wind_tunnel: {
+					start: 20, // hours from first time point
+					end: 180, // hours from first time point - if null then last time point
 				},
 
 				weekday_offset: {
@@ -119,15 +126,21 @@
 
 				z_index: null,
 
+				// Graphical elements
+				path: null,
 				center: null,
-				wind_max: null,
-				wind_34: null,
-				wind_50: null,
-				wind_64: null,
+				polygons: {
+					wind_area: [ null, null, null, null ],
+					wind_tunnel: [ null, null, null, null ],
+				},
 
 				animation: {
 					start: 114, // hours from first time point
 					end: 228, // hours from first time point - if null then last time point
+				},
+				wind_tunnel: {
+					start: 40, // hours from first time point
+					end: 275, // hours from first time point - if null then last time point
 				},
 
 				weekday_offset: {
@@ -338,8 +351,12 @@
 					data1 = timeseries[i-1].data;
 					data2 = timeseries[i].data;
 					data = {
-						lat:  interpolate_value(data1.lat, data2.lat, t),
-						lng:  interpolate_value(data1.lng, data2.lng, t),
+						lat:  interpolate_value(data1.lat, data2.lat, t), // Not spherical but difference is small
+						lng:  interpolate_value(data1.lng, data2.lng, t), // so planar approximation is OK    
+						heading: google.maps.geometry.spherical.computeHeading(
+							new google.maps.LatLng(data1),
+							new google.maps.LatLng(data2)
+						),
 						wind_max:  interpolate_value(data1.wind_max, data2.wind_max, t),
 						r_wind_max:  interpolate_value(data1.r_wind_max, data2.r_wind_max, t),
 						r_ne_wind_34:  interpolate_value(data1.r_ne_wind_34, data2.r_ne_wind_34, t),
@@ -388,46 +405,38 @@
 				return p;
 			}
 
-			function draw_wind_shapes(hurricane, data) {
+			function draw_wind_areas(hurricane, data) {
 
 				var p = new google.maps.LatLng(data);
 				var r = new Array();
 				var colors = new Array();
 				var alphas = new Array();
-				var paths, r_ne, r_se, r_sw, r_nw, hole, v, i, j, k;
+				var paths, r_ne, r_se, r_sw, r_nw, hole, v, i, j;
 
-				for (i=0 ; i < hurricane_spec.num_colors ; i++) {
+				for (i=0 ; i < hurricane_spec.num_wind_buckets ; i++) {
 
 					if (i == 0) {
 						r_ne = r_se = r_sw = r_nw = data.r_wind_max;
-						colors.push(hurricane.color.wind_max);
-						alphas.push(hurricane_spec.opacity.wind_max);
 					} else if (i == 1) {
 						r_ne = data.r_ne_wind_64;
 						r_se = data.r_se_wind_64;
 						r_sw = data.r_sw_wind_64;
 						r_nw = data.r_nw_wind_64;
-						colors.push(hurricane.color.wind_64);
-						alphas.push(hurricane_spec.opacity.wind_64);
 					} else if (i == 2) {
 						r_ne = data.r_ne_wind_50;
 						r_se = data.r_se_wind_50;
 						r_sw = data.r_sw_wind_50;
 						r_nw = data.r_nw_wind_50;
-						colors.push(hurricane.color.wind_50);
-						alphas.push(hurricane_spec.opacity.wind_50);
 					} else {
 						r_ne = data.r_ne_wind_34;
 						r_se = data.r_se_wind_34;
 						r_sw = data.r_sw_wind_34;
 						r_nw = data.r_nw_wind_34;
-						colors.push(hurricane.color.wind_34);
-						alphas.push(hurricane_spec.opacity.wind_34);
 					}
 
+					// Create wind speed polygons for each time point
 					if (r_ne == null || r_se == null || r_sw == null || r_nw == null) r[i] = null;
 					else {
-
 						v = new Array();
 						v.push(google.maps.geometry.spherical.computeOffset(p, r_ne * 1000, 45));
 						v.push(google.maps.geometry.spherical.computeOffset(p, r_se * 1000, 135));
@@ -437,7 +446,18 @@
 					}
 				}
 
-				for (i=0 ; i < hurricane_spec.num_colors ; i++) {
+				colors.push(hurricane.color.wind_max);
+				colors.push(hurricane.color.wind_64);
+				colors.push(hurricane.color.wind_50);
+				colors.push(hurricane.color.wind_34);
+
+				alphas.push(hurricane_spec.opacity.wind_max);
+				alphas.push(hurricane_spec.opacity.wind_64);
+				alphas.push(hurricane_spec.opacity.wind_50);
+				alphas.push(hurricane_spec.opacity.wind_34);
+
+
+				for (i=0 ; i < hurricane_spec.num_wind_buckets ; i++) {
 
 					if (r[i] == null) polygon = null;
 					else {
@@ -446,7 +466,7 @@
 						paths = new Array();
 						paths.push(r[i]);
 
-						// Hole4
+						// Hole
 						for (j=i-1 ; j >= 0 && r[j] == null ; j--) ;
 						if (j >= 0) {
 							hole = new Array();
@@ -459,24 +479,167 @@
 						polygon.setOptions({
 							fillColor: colors[i],
 							fillOpacity: alphas[i],
-							zIndex: (hurricane.z_index + hurricane_spec.num_colors - 1 - i),
+							zIndex: hurricane.z_index + hurricane_spec.num_wind_buckets * 2 - 1 - i,
 						});
 						polygon.setMap(hurricane.map);
 					}
 
-					if (i == 0) {
-						if (hurricane.wind_max != null) hurricane.wind_max.setMap(null);
-						hurricane.wind_max = polygon;
-					} else if (i == 1) {
-						if (hurricane.wind_64 != null) hurricane.wind_64.setMap(null);
-						hurricane.wind_64 = polygon;
-					} else if (i == 2) {
-						if (hurricane.wind_50 != null) hurricane.wind_50.setMap(null);
-						hurricane.wind_50 = polygon;
-					} else {
-						if (hurricane.wind_34 != null) hurricane.wind_34.setMap(null);
-						hurricane.wind_34 = polygon;
+					if (hurricane.polygons.wind_area[i] != null) hurricane.polygons.wind_area[i].setMap(null);
+					hurricane.polygons.wind_area[i] = polygon;
+				}
+			}
+
+			// Get points in loop with headings closest to path normals
+			function get_tunnel_vertices(p, loop, heading_left, heading_right) {
+
+				var v_left, v_right, d_left, d_right, heading_i, h, d, d_min, i, j;
+
+				for (i=0 ; i < loop.length ; i++) {
+
+					heading_i = google.maps.geometry.spherical.computeHeading(p, loop[i]);
+
+					for (j=0 ; j < 2 ; j++) {
+
+						if (j == 0) { h=heading_left ; d_min=d_left; }
+						else { h=heading_right ; d_min=d_right; }
+
+						d = h - heading_i;
+						while (d < -180) d += 360;
+						while (d > 180) d -= 360;
+						d = Math.abs(d);
+
+						if (i == 0 || d < d_min) {
+							if (j == 0) {
+								v_left = loop[i];
+								d_left = d;
+							} else {
+								v_right = loop[i];
+								d_right = d;
+							}
+						}
 					}
+				}
+
+				return({ left: v_left, right: v_right });
+			}
+
+
+			function draw_tunnel(hurricane) {
+
+				var hours = hurricane.wind_tunnel.start;
+				var colors = new Array();
+				var alphas = new Array();
+				var vertices = new Array();
+				var paths, hours, data, polygon, p, heading_left, heading_right, r_ne, r_se, r_sw, r_nw, r, v, w,  i, j, k;
+
+				for (i=0 ; i < hurricane_spec.num_wind_buckets ; i++) {
+					vertices.push({
+						left: new Array(),
+						right: new Array(),
+					});
+				}
+
+				for ( ; hours <= hurricane.wind_tunnel.end ; hours+=hurricane_spec.wind_tunnel_step) {
+
+					data = get_data_on_path(hours, hurricane.timeseries);
+
+					p = new google.maps.LatLng(data);
+
+					heading_left = data.heading - 90;
+					if (heading_left > 180) heading_left - 360;
+
+					heading_right = (data.heading + 90) % 360;
+					if (heading_right > 180) heading_right - 360;
+
+					for (i=0 ; i < hurricane_spec.num_wind_buckets ; i++) {
+
+						if (i == 0) {
+							r_ne = r_se = r_sw = r_nw = data.r_wind_max;
+						} else if (i == 1) {
+							r_ne = data.r_ne_wind_64;
+							r_se = data.r_se_wind_64;
+							r_sw = data.r_sw_wind_64;
+							r_nw = data.r_nw_wind_64;
+						} else if (i == 2) {
+							r_ne = data.r_ne_wind_50;
+							r_se = data.r_se_wind_50;
+							r_sw = data.r_sw_wind_50;
+							r_nw = data.r_nw_wind_50;
+						} else {
+							r_ne = data.r_ne_wind_34;
+							r_se = data.r_se_wind_34;
+							r_sw = data.r_sw_wind_34;
+							r_nw = data.r_nw_wind_34;
+						}
+
+						if (r_ne != null && r_se != null && r_sw != null && r_nw != null) {
+
+							// Ovoid
+							v = new Array();
+							v.push(google.maps.geometry.spherical.computeOffset(p, r_ne * 1000, 45));
+							v.push(google.maps.geometry.spherical.computeOffset(p, r_se * 1000, 135));
+							v.push(google.maps.geometry.spherical.computeOffset(p, r_sw * 1000, -135));
+							v.push(google.maps.geometry.spherical.computeOffset(p, r_nw * 1000, -45));
+							r = get_refined_loop(v);
+
+							// Tunnel vertices
+							w = get_tunnel_vertices(p, r, heading_left, heading_right);
+							vertices[i].left.push(w.left);
+							vertices[i].right.push(w.right);
+						}
+					}
+				}
+
+				v = new Array();
+				for (i=0 ; i < hurricane_spec.num_wind_buckets ; i++) {
+					v[i] = new Array();
+					w = vertices[i].left;
+					for (j=w.length-1 ; j >= 0 ; j--) v[i].push(w[j]);
+					w = vertices[i].right;
+					for (j=0 ; j < w.length ; j++) v[i].push(w[j]);
+				}
+
+				colors.push(hurricane.color.wind_max);
+				colors.push(hurricane.color.wind_64);
+				colors.push(hurricane.color.wind_50);
+				colors.push(hurricane.color.wind_34);
+
+				alphas.push(hurricane_spec.opacity.wind_max);
+				alphas.push(hurricane_spec.opacity.wind_64);
+				alphas.push(hurricane_spec.opacity.wind_50);
+				alphas.push(hurricane_spec.opacity.wind_34);
+
+				for (i=0 ; i < hurricane_spec.num_wind_buckets ; i++) {
+
+					if (i == 0 || i+1 == hurricane_spec.num_wind_buckets) {
+						hurricane.polygons.wind_tunnel[i] = null;
+						continue;
+					}
+
+					// Edge
+					paths = new Array();
+					paths.push(v[i]);
+
+					// Hole
+					if (i > 1) {
+						j =  i - 1;
+						if (j >= 0) {
+							w = new Array();
+							for (k=v[j].length-1 ; k >= 0 ; k--) w.push(v[j][k]);
+							paths.push(w);
+						}
+					}
+
+					polygon = new google.maps.Polygon({ paths: paths });
+					polygon.setOptions(hurricane_spec.style);
+					polygon.setOptions({
+						fillColor: colors[i],
+						fillOpacity: alphas[i],
+						zIndex: (hurricane.z_index + hurricane_spec.num_wind_buckets - 1 - i),
+					});
+					polygon.setMap(hurricane.map);
+
+					hurricane.polygons.wind_tunnel[i] = polygon;
 				}
 			}
 
@@ -490,9 +653,9 @@
 
 				animation.dh = dh;
 
-				for (i=0 ; i < animation.hurricanes.length ; i++) {
+				for (i=0 ; i < map_spec.hurricanes.length ; i++) {
 
-					hurricane = animation.hurricanes[i];
+					hurricane = map_spec.hurricanes[i];
 
 					period = hurricane.animation.end - hurricane.animation.start;
 					hours = hurricane.animation.start + dh - Math.floor(dh / period) * period;
@@ -501,7 +664,7 @@
 					day_and_time = hours_to_day_and_time(hours, hurricane.timeseries, hurricane.weekday_offset);
 
 					if (hurricane.center.pin.isReadyToMove()) hurricane.center.pin.moveTo(new google.maps.LatLng(data));
-
+ 
 					h = Number(day_and_time.time.substring(0,2));
 					if (h < 1) annotation = "12";
 					else if (h < 13) annotation = h;
@@ -518,14 +681,19 @@
 					hurricane.center.text.textContent = annotation;
 					document.getElementById("max-speed-" + hurricane.name).textContent = max_speed;
 
-					draw_wind_shapes(hurricane, data);
+					draw_wind_areas(hurricane, data);
 				}
 			}
 
-			function toggle_animation() {
+			function toggle_animation(go=null) {
 
 				var animation = time_spec.animation;
 
+				if (go != null) {
+					if (go && animation.timer != null) return;
+					if (!go && animation.timer == null) return;
+				}
+				
 				if (animation.timer == null) {
 					animation.t0 = new Date().getTime();
 					update_animation();
@@ -546,15 +714,14 @@
 				hurricane.data = get_nhc_time_cyclones(hurricane.data);
 				hurricane.timeseries = get_timeseries_from_path(hurricane.data);
 
-				var path = new google.maps.Polyline({
+				hurricane.path = new google.maps.Polyline({
 					path: get_valid_path(hurricane.data),
 					geodesic: true,
 					strokeColor: hurricane.color.path,
 					strokeOpacity: 1.0,
 					strokeWeight: hurricane_spec.path.width,
 				});
-
-			    path.setMap(map);
+			    hurricane.path.setMap(map);
 
 				if (hurricane.animation.end == null) {
 					hurricane.animation.end = hurricane.timeseries[hurricane.timeseries.length-1].hours;
@@ -566,8 +733,9 @@
 				);
 				hurricane.center.pin.setMap(map);
 
-				hurricane.z_index = hurricane_spec.z_index + time_spec.animation.hurricanes.length * hurricane_spec.num_colors;
-				time_spec.animation.hurricanes.push(hurricane);
+				hurricane.z_index = hurricane_spec.z_index + map_spec.hurricanes.length * hurricane_spec.num_wind_buckets;
+
+				map_spec.hurricanes.push(hurricane);
 			}
 
 			function draw_legend(hurricane) {
@@ -615,6 +783,57 @@
 				}
 			}
 
+			function switch_display(type=null) {
+
+				var tab_areas = document.getElementById("areas");
+				var tab_tunnels = document.getElementById("tunnels");
+				var hurricane, map, i, j;
+
+				if (type == null) {
+					if (tab_areas.classList.contains("selected")) type = "tunnels";
+					else if (tab_tunnels.classList.contains("selected")) type = "areas";
+					else type = "areas";
+				}
+
+				if (type === "areas") tab_areas.classList.add("selected");
+				else tab_areas.classList.remove("selected");
+
+				if (type === "tunnels") tab_tunnels.classList.add("selected");
+				else tab_tunnels.classList.remove("selected");
+
+				if (type === "areas") {
+
+					for (i=0 ; i < map_spec.hurricanes.length ; i++) {
+						hurricane = map_spec.hurricanes[i];
+						map = hurricane.map;
+						hurricane.path.setMap(map);
+						hurricane.center.pin.setMap(map);
+						for (j=0 ; j < hurricane_spec.num_wind_buckets ; j++) {
+							if (hurricane.polygons.wind_area[j] != null) hurricane.polygons.wind_area[j].setMap(map);
+							if (hurricane.polygons.wind_tunnel[j] != null) hurricane.polygons.wind_tunnel[j].setMap(null);
+						}
+					}
+
+					toggle_animation(true);
+
+				} else if (type === "tunnels") {
+
+					for (i=0 ; i < map_spec.hurricanes.length ; i++) {
+						hurricane = map_spec.hurricanes[i];
+						map = hurricane.map;
+						hurricane.path.setMap(null);
+						hurricane.center.pin.setMap(null);
+						for (j=0 ; j < hurricane_spec.num_wind_buckets ; j++) {
+							if (hurricane.polygons.wind_area[j] != null) hurricane.polygons.wind_area[j].setMap(null);
+							if (hurricane.polygons.wind_tunnel[j] != null) hurricane.polygons.wind_tunnel[j].setMap(map);
+						}
+					}
+
+					toggle_animation(false);
+
+				}
+			}
+
 			async function initialize() {
 
 				const { Map } = await google.maps.importLibrary("maps");
@@ -641,7 +860,10 @@
 				add_hurricane(map, beryl_spec);
 				add_hurricane(map, melissa_spec);
 
-				toggle_animation();
+				draw_tunnel(beryl_spec);
+				draw_tunnel(melissa_spec);
+
+				switch_display("areas");
 			}
 
 			// Bootstrap loader (Dynamic Library Import API)
@@ -698,7 +920,7 @@
 				position: absolute;
 				bottom: 12px;
 				left: 16px;
-				padding: 12px 16px;
+				padding: 12px 14px;
 				border-radius: 8px;
 				background-color: rgba(255, 255, 255, 0.85);
 			    filter: drop-shadow(0px 2px 2px rgba(0, 0, 0, 0.3));
@@ -707,7 +929,7 @@
 			.two-legends {
 				display: grid;
 				grid-template-columns: max-content max-content;
-				column-gap: 28px;
+				column-gap: 16px;
 				row-gap: 0px;
 			}
 			.card, .attribution, a {
@@ -742,6 +964,42 @@
 				white-space: no-wrap;
 				margin-bottom: 12px;
 			}
+			.tabs {
+				position: absolute;
+				top: 12px;
+				left: 16px;
+				display: grid;
+				grid-template-columns: max-content max-content;
+				column-gap: 12px;
+			}
+			.tabs div {
+				font-weight: 500;
+				line-height: 34px;
+				color: #80868b;
+				padding: 0 15px;
+				border-radius: 8px;
+				border: 1px solid #dadce0;
+				background-color: rgba(255, 255, 255, 0.8);
+			    user-select: none;
+				cursor: pointer;
+			}
+			.tabs div.selected {
+				border: 1px solid #e8f0fe;
+				color: #1967d2;
+				background-color: #e8f0fe;
+				pointer-events: none;
+			}
+			.tabs div.selected::before {
+		    	content: url("data:image/svg+xml; utf8, <svg width='20' height='20' xmlns='http://www.w3.org/2000/svg'><path d='M7 14.2 L2.8 10 L1.4 11.4 L7 17 L19 5 L17.6 3.6 L7 14.2Z' fill='blue' fill-opacity='0.8' stroke='none'/></svg>");
+				position: relative;
+				top: 5px;
+				left: -6px;
+				margin-right: 2px;
+			}
+			.tabs div:hover {
+				color: #3c4043;
+				background-color: #ffffff;
+			}
 			a[href^="http://maps.google.com/maps"] {
 				display:none !important;
 			}
@@ -759,10 +1017,14 @@
 
 	<body onload="initialize()">
 		<div class="map" id="map"></div>
+		<div class="tabs">
+			<div id="areas" onclick="switch_display()">Wind speeds over time</div>
+			<div id="tunnels" onclick="switch_display()">Wind tunnels</div>
+		</div>
 		<div class="card">
 			<div class="two-legends">
-				<div class="title">Hurricane Melissa path & wind speeds (Oct 2025)</div>
-				<div class="title">Hurricane Beryl path & wind speeds (July 2024)</div>
+				<div class="title">Hurricane Melissa wind speeds (Oct 2025)</div>
+				<div class="title">Hurricane Beryl wind speeds (July 2024)</div>
 				<div class="legend" id="legend-Melissa"></div>
 				<div class="legend" id="legend-Beryl"></div>
 			</div>
@@ -770,8 +1032,8 @@
 				Visualizations based on data from
 				<a href="https://deepmind.google.com/science/weatherlab" target="_blank" rel="noopener noreferrer">
 					Google Weather Lab Preview: Cyclones</a>
-				(licensed under
-				<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>).
+				(license
+				<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>)
 			</div>
 		</div>
 	</body>
