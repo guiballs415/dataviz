@@ -787,6 +787,7 @@
 
 				var tab_areas = document.getElementById("areas");
 				var tab_tunnels = document.getElementById("tunnels");
+				var play_pause = document.getElementById("play-pause");
 				var hurricane, map, i, j;
 
 				if (type == null) {
@@ -814,7 +815,8 @@
 						}
 					}
 
-					toggle_animation(true);
+					if (!play_pause.classList.contains("pause")) toggle_animation(true);
+					play_pause.classList.remove("hide");
 
 				} else if (type === "tunnels") {
 
@@ -830,7 +832,23 @@
 					}
 
 					toggle_animation(false);
+					play_pause.classList.add("hide");
+				}
+			}
 
+			function play_pause() {
+
+				var button = document.getElementById("play-pause");
+
+				if (button.classList.contains("pause")) {
+
+					button.classList.remove("pause");
+					toggle_animation(true);
+
+				} else {
+
+					button.classList.add("pause");
+					toggle_animation(false);
 				}
 			}
 
@@ -846,7 +864,7 @@
 					mapTypeId: 'hybrid',
 					disableDefaultUI: true,
 					zoomControl: true,
-				    zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_TOP },
+				    zoomControlOptions: { position: google.maps.ControlPosition.BOTTOM_RIGHT },
 				});
 
 				map.fitBounds(
@@ -864,6 +882,7 @@
 				draw_tunnel(melissa_spec);
 
 				switch_display("areas");
+				console.log("display="+div.style.display);
 			}
 
 			// Bootstrap loader (Dynamic Library Import API)
@@ -1000,6 +1019,35 @@
 				color: #3c4043;
 				background-color: #ffffff;
 			}
+			.play-pause {
+				position: absolute;
+				top: 12px;
+				right: 16px;
+				width: 48px;
+				height: 36px;
+				border-radius: 8px;
+				background-color: #e8f0fe;
+			    user-select: none;
+				cursor: pointer;
+			}
+			.play-pause::before {
+		    	content: url("data:image/svg+xml; utf8, <svg width='24' height='24' fill='black' fill-opacity='0.7' stroke='none' xmlns='http://www.w3.org/2000/svg'><path d='M 4 20 V 4 H 9.5 V 20 H 4 Z'/><path d='M 14.5 20 V 4 H 20 V 20 H 14.5 Z'/></svg>");
+				position: relative;
+				top: 6px;
+				left: 11px;
+			}
+			.play-pause.pause::before {
+		    	content: url("data:image/svg+xml; utf8, <svg width='24' height='24' fill='black' fill-opacity='0.7' stroke='none' xmlns='http://www.w3.org/2000/svg'><path d='M 6 21 V 3 L 20 12 L 6 21 Z'/></svg>");
+				position: relative;
+				top: 6px;
+				left: 12px;
+			}
+			.play-pause:hover {
+				background-color: #ffffff;
+			}
+			.play-pause.hide {
+				display: none;
+			}
 			a[href^="http://maps.google.com/maps"] {
 				display:none !important;
 			}
@@ -1036,6 +1084,7 @@
 				<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>)
 			</div>
 		</div>
+		<div class="play-pause" id="play-pause" onclick="play_pause()"></div>
 	</body>
 
 </html>
