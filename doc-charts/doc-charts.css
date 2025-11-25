@@ -160,10 +160,10 @@ body.popup .popup {
 	text-align: center;
 }
 .map-legend .colors {
+	display: flex;
 	height: 24px;
 }
 .map-legend .colors div {
-	display: inline-block;
 	width: 80px;
 	height: 24px;
 }
@@ -176,11 +176,11 @@ body.popup .popup {
 	border-bottom-right-radius: 4px;
 }
 .map-legend .ticks {
+	display: flex;
 	margin-top: -2px;
 	height: 14px;
 }
 .map-legend .ticks div {
-	display: inline-block;
 	width: 80px;
 	white-space: no-wrap;
 	text-align: center;
@@ -276,7 +276,6 @@ body.popup .popup {
 	grid-template-columns: 64px max-content;
 }
 .table div.value-with-bar div.bar {
-	display: inline-block;
 	height: 8px;
 	margin-top: 7px;
 	margin-right: 4px;
