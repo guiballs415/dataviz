@@ -1,5 +1,6 @@
 var timeseries_spec = {
 
+	// Size including padding
 	width: 600,
 	height: 280,
 
@@ -16,9 +17,10 @@ var timeseries_spec = {
 
 	tick: {
 		length: 6,
-		margin: 24,
+		margin: 24, // distance between left/right end of axis and first/last tick
 	},
 
+	// Make room for labels, etc
 	padding: {
 		top: 10,
 		right: 40,
@@ -30,10 +32,10 @@ var timeseries_spec = {
 		size: 14,
 		color: "#202124",
 		margin: {
-			level: 6, // distance between axis and right edge of label
-			tick: 8,
+			level: 6, // distance between y-axis and right edge of label
+			tick: 8, // distance between x-axis and top edge of label
 		},
-		height: 16,
+		height: 16, // To add a second line
 	},
 
 	line: {
@@ -66,6 +68,7 @@ var parishes_chart_spec = {
 };
 
 // Limited to interpolation within same day
+// Only works with "wind" metric for now
 function interpolate_time(t1, t2, target) {
 
 	var hr = Number(t1.time.substring(0,2));
@@ -158,6 +161,7 @@ function transform_hurricane_force_timeseries(spec) {
 	return data;
 }
 
+// Only works with "wind" metric for now
 function get_timeseries_chart(data_slices, data_spec) {
 
 	var chart_spec = timeseries_spec;

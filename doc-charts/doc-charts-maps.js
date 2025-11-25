@@ -53,15 +53,35 @@ function create_map_legend(spec, legend) {
 	}
 }
 
+function draw_melissa_layers(map) {
+
+	var spec = melissa_spec;
+	var vertices = spec.vertices;
+	var polygon, paths, v, i, j, k;
+
+	for (i=0 ; i < vertices.length ; i++) {
+
+		paths = new Array();
+		for (j=0 ; j < vertices[i].length ; j++) {
+
+			v = new Array();
+			for (k=0 ; k < vertices[i][j].length ; k++) v.push(new google.maps.LatLng(vertices[i][j][k]));
+
+			paths.push(v);
+		}
+
+		polygon = new google.maps.Polygon({ paths: paths });
+		polygon.setOptions(spec.style);
+		polygon.setOptions({ fillColor: spec.colors[i] });
+		polygon.setMap(map);
+	}
+}
+
 function add_maximize_button(div, data_spec) {
 
 	var button = document.createElement("div");
 	button.classList.add("maximize-button");
 	div.appendChild(button);
-
-	div.addEventListener("scroll", function() {
-		button.style.right = (data_spec.ui.button.initial_position - div.scrollLeft) + "px";
-	});
 
 	button.addEventListener("click", function() {
 		maximize_dataviz(data_spec);
@@ -101,30 +121,6 @@ function maximize_map(spec, center, zoom) {
 	show_maximized_content(div);
 }
 
-function draw_melissa_layers(map) {
-
-	var spec = melissa_spec;
-	var vertices = spec.vertices;
-	var polygon, paths, v, i, j, k;
-
-	for (i=0 ; i < vertices.length ; i++) {
-
-		paths = new Array();
-		for (j=0 ; j < vertices[i].length ; j++) {
-
-			v = new Array();
-			for (k=0 ; k < vertices[i][j].length ; k++) v.push(new google.maps.LatLng(vertices[i][j][k]));
-
-			paths.push(v);
-		}
-
-		polygon = new google.maps.Polygon({ paths: paths });
-		polygon.setOptions(spec.style);
-		polygon.setOptions({ fillColor: spec.colors[i] });
-		polygon.setMap(map);
-	}
-}
-
 function create_map(spec, div, legend) {
 
 	var map, bounds, button;
@@ -155,6 +151,6 @@ function create_map(spec, div, legend) {
 
 // Bootstrap loader (Dynamic Library Import API)
 (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
-	key: "AIzaSyCqHHpYbRdkCj5_gWK6V51ZRuAK__gg1-8",
+	key: "AIzaSyBso2blH4dR4oYVIBzosWqaN-9pHCVnQ4w",
     v: "weekly",
 });
