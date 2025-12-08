@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+
+	<head>
+	    <meta charset="utf-8">
+		<title>GSR layout #2 (cleanup #1)</title>
+
+		<script>
+			var initial_map_view = {
+				center: { lat: 19.323533, lng: -81.215627 }, // Cayman Islands
+				zoom: 7,
+			};
+
+			var chat_responses = {
+				count: 0,
+				text: [
+					"This is just a layout mockup. There's no agent hooked up to this UI so these are just canned responses.", 
+					"You might enter more prompts just to fill up the chat panel to see what it looks like as it fills up and how it scrolls.", 
+				],
+			};
+
+			var layers = [
+				{ type: "polygon", name: "Wind speed ≥ 34 knots" },
+				{ type: "polygon", name: "Wind speed ≥ 50 knots" },
+				{ type: "polygon", name: "Wind speed ≥ 64 knots" },
+			];
+
+			function draw_map() {
+
+				var div = document.getElementById("map");
+				var map = new google.maps.Map(div, {
+					center: initial_map_view.center,
+					zoom: initial_map_view.zoom,
+					mapTypeId: 'hybrid',
+					disableDefaultUI: true,
+					mapTypeControl: true,
+					mapTypeControlOptions: {
+			    		style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
+						position: google.maps.ControlPosition.TOP_RIGHT,
+					},
+					zoomControl: true,
+					zoomControlOptions: {
+						position: google.maps.ControlPosition.RIGHT_BOTTOM,
+					},
+					streetViewControl: true,
+					streetViewControlOptions: {
+						position: google.maps.ControlPosition.BOTTOM_RIGHT,
+					},
+				});
+			}
+
+			function get_input() {
+
+				var input = document.getElementById("input");
+				var text = input.value.trim();
+
+				input.value = "";
+				if (text.length == 0) return;
+
+				add_input(text);
+				add_text(chat_responses.text[chat_responses.count % chat_responses.text.length]);
+				chat_responses.count++;
+
+			    event.preventDefault();
+
+				return true;
+			}
+
+			function add_output(div) {
+
+				var output = document.getElementById("output");
+
+				output.appendChild(div);
+
+				output.scrollTop = output.scrollHeight;
+			}
+
+			function add_input(text) {
+
+				var bubble = document.createElement("div");
+				var content = document.createElement("div");
+
+				bubble.classList.add("bubble");
+				content.textContent = text;
+				bubble.appendChild(content);
+
+				add_output(bubble);
+			}
+
+			function add_text(text) {
+
+				var content = document.createElement("div");
+
+				content.classList.add("text");
+				content.textContent = text;
+
+				add_output(content);
+			}
+
+			function add_layer(type, name) {
+
+				var list = document.getElementById("layer-list");
+				var count = document.getElementById("layer-count");
+				var item;
+
+				item = document.createElement("div");
+				item.classList.add(type);
+				list.appendChild(item);
+
+				item = document.createElement("div");
+				item.classList.add("name");
+				item.textContent = name;
+				list.appendChild(item);
+
+				item = document.createElement("div");
+				item.classList.add("visible");
+				list.appendChild(item);
+
+				count.textContent = "(" + Math.round(list.childElementCount / 3) + ")";
+			}
+
+			function manage_panels(id, visible) {
+				console.log("hello " + id + " " + visible);
+				var panel = document.getElementById(id);
+				var toggle = document.getElementById(id + "-toggle");
+				if (visible) {
+					panel.classList.remove("hide");
+					toggle.classList.add("hide");
+				} else {
+					panel.classList.add("hide");
+					toggle.classList.remove("hide");
+				}
+			}
+
+			async function initialize() {
+
+				document.getElementById("input").addEventListener("keydown", function(event) {
+				    if (event.which == 13) {
+						if (!event.repeat) {
+							var new_event = new Event("submit", { cancelable: true });
+							event.target.form.dispatchEvent(new_event);
+						}
+						event.preventDefault();
+					}
+				});
+
+				for (var i=0 ; i < layers.length ; i++) add_layer(layers[i].type, layers[i].name);
+
+				const { Map } = await google.maps.importLibrary("maps");
+				draw_map();
+			}
+
+			// Bootstrap loader (Dynamic Library Import API)
+			(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+				key: "AIzaSyCqHHpYbRdkCj5_gWK6V51ZRuAK__gg1-8",
+    			v: "weekly",
+			});
+		</script>
+
+		<style>
+			:root {
+				box-sizing: border-box;
+			}
+			* {
+				box-sizing: inherit;
+			}
+			body {
+				margin: 0;
+				font-family: "Google Sans", Arial, sans-serif;
+			}
+			.layout {
+				display: flex;
+				flex-direction: column;
+				min-height: 100vh;
+			}
+			.layout .top {
+				padding: 16px 24px;
+			}
+			.layout .top .title {
+				font-size: 24px;
+				font-weight: 700;
+				line-height: 32px;
+				background-image: linear-gradient(to right, oklch(0.707 0.165 254.624) 0px, oklch(0.792 0.209 151.711) 100%);
+				background-clip: text;
+				color: transparent;
+				display: inline-block;
+			}
+			.layout .top,
+			.panel,
+			.panel-toggle,
+			.layer-manager,
+			.layer-manager-toggle {
+				background-color: #131314;
+			}
+			.layout .ui {
+				display: flex;
+				flex: 1;
+				position: relative;
+			} 
+			.layout .ui .map {
+				flex: 1;
+			}
+			.layout .ui .two-panels {
+				display: flex;
+				flex-direction: row;
+				column-gap: 12px;
+				position: absolute;
+				top: 12px;
+				left: 12px;
+				bottom: 12px;
+			}
+			.panel,
+			.panel-toggle,
+			.layer-manager,
+			.layer-manager-toggle {
+				color: #e3e3e3;
+				border-radius: 16px;				
+			}
+			.two-panels .panel {
+				display: grid;
+				grid-template-rows: max-content auto max-content;
+				width: 500px;
+				height: 100%;
+			    filter: drop-shadow(0px 4px 4px rgba(0, 0, 0, 0.35));
+			}
+			.panel .top,
+			.panel-toggle,
+			.layer-manager .top,
+			.layer-manager-toggle {
+				display: flex;
+				flex-direction: row;
+				align-items: center;
+				padding: 0 18px;
+				height: 56px;
+			}
+			.panel .top,
+			.layer-manager .top {
+				border-radius: 16px 16px 0 0;
+			}
+			.panel .top {
+				border-bottom: 1px solid #444746;
+			}
+			.panel .top .logo::before,
+			.panel-toggle .icon::before {
+				content: url("data:image/svg+xml; utf8, <svg width='24' height='24' viewBox='0 0 24 24' fill='white' fill-opacity='0.75' xmlns='http://www.w3.org/2000/svg'><path d='M6 14H14V12H6V14ZM6 11H16.025V9H6V11ZM6 8H12.025V6H6V8ZM4 16V4V12V11.825V16ZM2 22V4C2 3.45 2.19583 2.97917 2.5875 2.5875C2.97917 2.19583 3.45 2 4 2H12V4H4V17.125L5.15 16H20V12H22V16C22 16.55 21.8042 17.0208 21.4125 17.4125C21.0208 17.8042 20.55 18 20 18H6L2 22ZM18.5 10C18.4833 10 18.4167 9.95 18.3 9.85C18.0333 8.83333 17.5292 7.95417 16.7875 7.2125C16.0458 6.47083 15.1667 5.96667 14.15 5.7C14.1167 5.68333 14.0667 5.61667 14 5.5C14 5.46667 14.05 5.4 14.15 5.3C15.1667 5.03333 16.0458 4.52917 16.7875 3.7875C17.5292 3.04583 18.0333 2.16667 18.3 1.15C18.3167 1.11667 18.3833 1.06667 18.5 1C18.5333 1 18.6 1.05 18.7 1.15C18.9833 2.16667 19.4917 3.04583 20.225 3.7875C20.9583 4.52917 21.8333 5.03333 22.85 5.3C22.8833 5.3 22.9333 5.36667 23 5.5C23 5.51667 22.95 5.58333 22.85 5.7C21.8333 5.96667 20.9542 6.47083 20.2125 7.2125C19.4708 7.95417 18.9667 8.83333 18.7 9.85C18.7 9.88333 18.6333 9.93333 18.5 10Z'/></svg>");
+				position: relative;
+				top: 4px;
+				margin-right: 8px;
+			}
+			.panel .top .title,
+			.layer-manager .top .title,
+			.panel-toggle .title,
+			.layer-manager-toggle .title,
+			.layer-manager-toggle .count {
+				font-size: 14px;
+				font-weight: 400;
+				line-height: 20px;
+				color: #e3e3e3;
+			}
+			.panel .top .title,
+			.layer-manager .top .title {
+				flex: 1;
+			}
+			.panel .top .close,
+			.layer-manager .top .close {
+				width: 32px;
+				height: 32px;
+				border-radius: 16px;
+				margin-right: -4px;
+				cursor: pointer;
+			}
+			.panel .top .close::before,
+			.layer-manager .top .close::before {
+			    content: url("data:image/svg+xml; utf8, <svg width='24' height='24' fill='white' fill-opacity='0.75' xmlns='http://www.w3.org/2000/svg'><path d='M5 6.4L6.4 5L12 10.6L17.6 5L19 6.4L13.4 12L19 17.6L17.6 19L12 13.4L6.4 19L5 17.6L10.6 12L5 6.4Z'/></svg>");
+				position: relative;
+				top: 4px;
+				left: 4px;
+			}
+			.panel .top .close:hover,
+			.layer-manager .top .close:hover {
+				background-color: rgba(255, 255, 255, 0.1);
+			}
+			.panel .bottom {
+				display: flex;
+				flex-direction: column;
+				row-gap: 12px;
+				padding: 14px 12px;
+				border-radius: 0 0 16px 16px;
+				border-top: 1px solid #444746;
+			}
+			.panel .chat {
+				width: 100%;
+				height: 100%;
+				overflow-x: hidden;
+				overflow-y: auto;
+				scrollbar-width: thin;
+			    scrollbar-color: #80868b #131314;
+			}
+			.chat .bubble,
+			.chat .text {
+				font-size: 14px;
+				font-weight: 400;
+				line-height: 20px;
+				color: #ffffff;
+				white-space: pre-line;
+				margin-left: 24px;
+				margin-top: 16px;
+				margin-bottom: 16px;
+			}
+			.chat .bubble {
+				margin-right: 4px;
+			}
+			.chat .text {
+				margin-right: 24px;
+			}
+			.chat .bubble div {
+				margin: 12px 18px 12px auto;
+				width: max-content;
+				max-width: 85%;
+				padding: 8px 12px;
+				background-color: #004a77;
+				border-radius: 16px 2px 16px 16px;
+			}
+			.panel .bottom form .input {
+				display: grid;
+				grid-template-columns: auto max-content;
+				column-gap: 8px;
+				align-items: center;
+				padding: 12px;
+				border-radius: 12px;
+				background-color: #333537;
+			}
+			.panel .bottom form .input textarea {
+				font-family: "Google Sans", Arial, sans-serif;
+				font-size: 14px;
+				font-weight: 400;
+				line-height: 20px;
+				color: #e3e3e3;
+				background-color: rgba(0, 0, 0, 0);
+				border: none;
+				resize: none;
+				field-sizing: content;
+				max-height: 300px;
+				overflow: hidden;
+			}
+			.panel .bottom form .input textarea:focus {
+				border: none;
+				outline: none;
+			}
+			.panel .bottom form .input textarea::placeholder {
+				color: #e3e3e3;
+				opacity: 1;
+			}
+			.panel .bottom form .input button {
+				width: 20px;
+				height: 20px;
+				background: none;
+				border: none;
+				padding: 0;
+				cursor: pointer;
+			}
+			.panel .bottom form .input button::before {
+				content: url("data:image/svg+xml; utf8, <svg width='24' height='24' viewBox='0 0 24 24' fill='white' fill-opacity='0.75' xmlns='http://www.w3.org/2000/svg'><path d='M 2 21 L 23 12 L 2 3 L 2 10 l 15 2 l -15 2 Z' transform='scale(0.8333)'/></svg>");
+			}
+			.panel .bottom .small-print {
+				font-size: 12px;
+				font-weight: 400;
+				line-height: 16px;
+				text-align: center;
+				color: #e3e3e3;
+			}
+			.panel .bottom .small-print a {
+				color: #e3e3e3;
+			}
+			.layer-manager {
+				display: flex;
+				flex-direction: column;
+				width: fit-content;
+				height: fit-content;
+				max-height: 100%;
+			}
+			.layer-manager .list {
+				display: grid;
+				grid-template-columns: max-content max-content max-content;
+				column-gap: 12px;
+				row-gap: 8px;
+				align-items: center;
+				padding: 0 16px 20px 16px;
+			}
+			.layer-manager .list .polygon::before {
+			    content: url("data:image/svg+xml; utf8, <svg width='24' height='24' xmlns='http://www.w3.org/2000/svg'><g fill='gainsboro'><circle cx='7' cy='5' r='3'/><circle cx='3' cy='19' r='3'/><circle cx='17' cy='19' r='3'/><circle cx='21' cy='5' r='3'/></g><path d='M 7 5 L 3 19 L 17 19 L 21 5 Z' stroke='gainsboro' stroke-width='1.6' fill='none'/></svg>");
+				position: relative;
+				top: 4px;
+			}
+			.layer-manager .list .name {
+				font-size: 12px;
+				font-weight: 400;
+				line-height: 16px;
+				color: #e3e3e3;
+		        max-width: 180px;
+				white-space: nowrap;
+		        overflow: hidden;
+				text-overflow: ellipsis;
+			}
+			.layer-manager .list .visible::before {
+			    content: url("data:image/svg+xml; utf8, <svg width='24' height='24' fill='white' fill-opacity='0.75' xmlns='http://www.w3.org/2000/svg'><path d='M12 16C13.25 16 14.3125 15.5625 15.1875 14.6875C16.0625 13.8125 16.5 12.75 16.5 11.5C16.5 10.25 16.0625 9.1875 15.1875 8.3125C14.3125 7.4375 13.25 7 12 7C10.75 7 9.6875 7.4375 8.8125 8.3125C7.9375 9.1875 7.5 10.25 7.5 11.5C7.5 12.75 7.9375 13.8125 8.8125 14.6875C9.6875 15.5625 10.75 16 12 16ZM12 14.2C11.25 14.2 10.6125 13.9375 10.0875 13.4125C9.5625 12.8875 9.3 12.25 9.3 11.5C9.3 10.75 9.5625 10.1125 10.0875 9.5875C10.6125 9.0625 11.25 8.8 12 8.8C12.75 8.8 13.3875 9.0625 13.9125 9.5875C14.4375 10.1125 14.7 10.75 14.7 11.5C14.7 12.25 14.4375 12.8875 13.9125 13.4125C13.3875 13.9375 12.75 14.2 12 14.2ZM12 19C9.56667 19 7.35 18.3208 5.35 16.9625C3.35 15.6042 1.9 13.7833 1 11.5C1.9 9.21667 3.35 7.39583 5.35 6.0375C7.35 4.67917 9.56667 4 12 4C14.4333 4 16.65 4.67917 18.65 6.0375C20.65 7.39583 22.1 9.21667 23 11.5C22.1 13.7833 20.65 15.6042 18.65 16.9625C16.65 18.3208 14.4333 19 12 19ZM12 17C13.8833 17 15.6125 16.5042 17.1875 15.5125C18.7625 14.5208 19.9667 13.1833 20.8 11.5C19.9667 9.81667 18.7625 8.47917 17.1875 7.4875C15.6125 6.49583 13.8833 6 12 6C10.1167 6 8.3875 6.49583 6.8125 7.4875C5.2375 8.47917 4.03333 9.81667 3.2 11.5C4.03333 13.1833 5.2375 14.5208 6.8125 15.5125C8.3875 16.5042 10.1167 17 12 17Z'/></svg>");
+				position: relative;
+				top: 4px;
+				left: -1px;
+			}
+			.panel-toggle,
+			.layer-manager-toggle {
+				min-width: 140px;
+				border-bottom: 1px solid rgba(0,0,0,0);
+				cursor: pointer;
+			}
+			.panel-toggle .icon::before,
+			.layer-manager-toggle .icon::before {
+				margin-right: 8px;
+				position: relative;
+				top: 4px;
+			}
+			.layer-manager-toggle .icon::before {
+				content: url("data:image/svg+xml; utf8, <svg width='24' height='24' viewBox='0 0 24 24' fill='white' fill-opacity='0.75' xmlns='http://www.w3.org/2000/svg'><path d='M12 21.05L3 14.05L4.65 12.8L12 18.5L19.35 12.8L21 14.05L12 21.05ZM12 16L3 9L12 2L21 9L12 16ZM12 13.45L17.75 9L12 4.55L6.25 9L12 13.45Z'/></svg>");
+			}
+			.layer-manager-toggle .count {
+				margin-left: 4px;
+			}
+			.layer-manager-toggle:hover .icon::before {
+				content: url("data:image/svg+xml; utf8, <svg width='24' height='24' viewBox='0 0 24 24' fill='white' fill-opacity='1' xmlns='http://www.w3.org/2000/svg'><path d='M12 21.05L3 14.05L4.65 12.8L12 18.5L19.35 12.8L21 14.05L12 21.05ZM12 16L3 9L12 2L21 9L12 16ZM12 13.45L17.75 9L12 4.55L6.25 9L12 13.45Z'/></svg>");
+			}
+			.panel-toggle:hover .title,
+			.layer-manager-toggle:hover .title,
+			.layer-manager-toggle:hover .count {
+				color: #ffffff;
+			}
+			.panel.hide,
+			.panel-toggle.hide,
+			.layer-manager.hide,
+			.layer-manager-toggle.hide {
+				display: none;
+			}
+			a[href^="http://maps.google.com/maps"] {
+				display: none !important;
+			}
+			a[href^="https://maps.google.com/maps"] {
+				display: none !important;
+			}
+			.gmnoprint a, .gmnoprint span, .gm-style-cc {
+			    display: none;
+			}
+			.gmnoprint div {
+			    background: none !important;
+			}
+		</style>
+	</head>
+
+	<body onload="initialize()">
+		<div class="layout">
+
+			<div class="top">
+				<div class="title">Earth AI</div>
+			</div>
+
+			<div class="ui">
+
+				<div class="map" id="map"></div>
+
+				<div class="two-panels">
+
+					<div class="panel" id="panel">
+						<div class="top">
+							<div class="logo"></div>
+							<div class="title">Geospatial Reasoning</div>
+							<div class="close" onclick="manage_panels('panel',false)"></div>
+						</div>
+						<div class="chat" id="output"></div>
+						<div class="bottom">
+							<form onsubmit="return get_input()" method="post">
+								<div class="input">
+									<textarea placeholder="Ask a question" id="input"></textarea>
+									<button type="submit"></button>
+								</div>
+							</form>
+							<div class="small-print">
+								This is a generative AI experiment. Accuracy and quality may vary.
+								<a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank">Learn more</a>
+							</div>
+						</div>
+					</div>
+
+					<div class="panel-toggle hide" id="panel-toggle" onclick="manage_panels('panel',true)">
+						<div class="icon"></div>
+						<div class="title">Geospatial Reasoning</div>
+					</div>
+
+					<div class="layer-manager hide" id="layer-manager">
+						<div class="top">
+							<div class="title">Toggle layers</div>
+							<div class="close" onclick="manage_panels('layer-manager',false)"></div>
+						</div>
+						<div class="list" id="layer-list"></div>
+					</div>
+
+					<div class="layer-manager-toggle" id="layer-manager-toggle" onclick="manage_panels('layer-manager',true)">
+						<div class="icon"></div>
+						<div class="title">Layers</div>
+						<div class="count" id="layer-count"></div>
+					</div>
+
+				</div>
+
+			</div>
+		</div>
+	</body>
+</html>
