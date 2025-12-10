@@ -11,6 +11,17 @@
 				zoom: 7,
 			};
 
+			var initial_chat_content = [
+				{ type: "prompt", text: "How might the UI be cleaned up?"},
+				{ type: "text", text: "There's a couple of problems with the current layout:" },
+				{ type: "text", text: "(A) The chat panel doesn't take full advantage of the vertical space." },
+				{ type: "text", text: "(B) The panel competes for space with the map UI controls, sometimes occluding them." },
+				{ type: "text", text: "(C) When the chat panel is closed (to get a better view of the map) the button for reopening it doesn't feel consistent with the style of the panel or the affordance for opening the layer manager." },
+				{ type: "text", text: "This layout demo addresses these issues with the following chnges:" },
+				{ type: "step", text: "Move chat panel to left hand side, with a height that fills the available space responsively." },
+				{ type: "step", text: "Map UI controls remain on right hand side without competing for space with GSR UI." },
+				{ type: "step", text: "Button for reopening chat panel follows visual style of layer manager button." },
+			]
 			var chat_responses = {
 				count: 0,
 				text: [
@@ -20,9 +31,9 @@
 			};
 
 			var layers = [
-				{ type: "polygon", name: "Wind speed ≥ 34 knots" },
-				{ type: "polygon", name: "Wind speed ≥ 50 knots" },
-				{ type: "polygon", name: "Wind speed ≥ 64 knots" },
+				{ type: "polygon", color: "#f9ab00", name: "Wind speed ≥ 34 knots" },
+				{ type: "polygon", color: "#e52592", name: "Wind speed ≥ 50 knots" },
+				{ type: "polygon", color: "#9334e6", name: "Wind speed ≥ 64 knots" },
 			];
 
 			function draw_map() {
@@ -55,57 +66,66 @@
 				var text = input.value.trim();
 
 				input.value = "";
-				if (text.length == 0) return;
 
-				add_input(text);
-				add_text(chat_responses.text[chat_responses.count % chat_responses.text.length]);
-				chat_responses.count++;
+				if (text.length > 0) {
+					add_output("prompt", text);
+					add_output("text", chat_responses.text[chat_responses.count % chat_responses.text.length]);
+					chat_responses.count++;
+				}
 
-			    event.preventDefault();
+				event.preventDefault();
 
 				return true;
 			}
 
-			function add_output(div) {
+			function add_output(type, text) {
 
 				var output = document.getElementById("output");
+				var div = document.createElement("div");
+
+				if (type === "prompt") {
+
+					var content = document.createElement("div");
+					div.appendChild(content);
+					div.classList.add("bubble");
+					content.textContent = text;
+
+				} else if (type === "step") {
+
+					var bullet = document.createElement("div");
+					var content = document.createElement("div");
+					div.appendChild(bullet);
+					div.appendChild(content);
+					div.classList.add("step");
+					bullet.classList.add("bullet");
+					content.textContent = text;
+					
+				} else {
+
+					div.classList.add("text");
+					div.textContent = text;
+				}
 
 				output.appendChild(div);
-
 				output.scrollTop = output.scrollHeight;
 			}
 
-			function add_input(text) {
-
-				var bubble = document.createElement("div");
-				var content = document.createElement("div");
-
-				bubble.classList.add("bubble");
-				content.textContent = text;
-				bubble.appendChild(content);
-
-				add_output(bubble);
-			}
-
-			function add_text(text) {
-
-				var content = document.createElement("div");
-
-				content.classList.add("text");
-				content.textContent = text;
-
-				add_output(content);
-			}
-
-			function add_layer(type, name) {
+			function add_layer(type, color, name) {
 
 				var list = document.getElementById("layer-list");
 				var count = document.getElementById("layer-count");
-				var item;
+				var item, svg_str;
 
 				item = document.createElement("div");
 				item.classList.add(type);
 				list.appendChild(item);
+
+				svg_str = "<svg width='24' height='24' xmlns='http://www.w3.org/2000/svg'><g fill='"
+					+ color
+					+ "'><circle cx='7' cy='5' r='3'/><circle cx='3' cy='19' r='3'/><circle cx='17' cy='19' r='3'/><circle cx='21' cy='5' r='3'/></g><path d='M 7 5 L 3 19 L 17 19 L 21 5 Z' stroke='"
+					+ color
+					+ "' stroke-width='1.6' fill='none'/></svg>";
+					item.innerHTML = svg_str;
 
 				item = document.createElement("div");
 				item.classList.add("name");
@@ -126,6 +146,7 @@
 				if (visible) {
 					panel.classList.remove("hide");
 					toggle.classList.add("hide");
+					if (id === "panel") document.getElementById("input").focus();
 				} else {
 					panel.classList.add("hide");
 					toggle.classList.remove("hide");
@@ -144,7 +165,9 @@
 					}
 				});
 
-				for (var i=0 ; i < layers.length ; i++) add_layer(layers[i].type, layers[i].name);
+				for (var i=0 ; i < layers.length ; i++) add_layer(layers[i].type, layers[i].color, layers[i].name);
+
+				for (var j=0 ; j < initial_chat_content.length ; j++) add_output(initial_chat_content[j].type, initial_chat_content[j].text);
 
 				const { Map } = await google.maps.importLibrary("maps");
 				draw_map();
@@ -214,7 +237,7 @@
 			.layer-manager,
 			.layer-manager-toggle {
 				color: #e3e3e3;
-				border-radius: 16px;				
+				border-radius: 16px;
 			}
 			.two-panels .panel {
 				display: grid;
@@ -297,7 +320,8 @@
 			    scrollbar-color: #80868b #131314;
 			}
 			.chat .bubble,
-			.chat .text {
+			.chat .text,
+			.chat .step {
 				font-size: 14px;
 				font-weight: 400;
 				line-height: 20px;
@@ -310,7 +334,8 @@
 			.chat .bubble {
 				margin-right: 4px;
 			}
-			.chat .text {
+			.chat .text,
+			.chat .step {
 				margin-right: 24px;
 			}
 			.chat .bubble div {
@@ -320,6 +345,24 @@
 				padding: 8px 12px;
 				background-color: #004a77;
 				border-radius: 16px 2px 16px 16px;
+			}
+			.chat .step {
+				display: flex;
+				flex-direction: row;
+				column-gap: 8px;
+			}
+			.chat .step .bullet {
+				width: 14px;
+				height: 14px;
+				border-radius: 7px;
+				background-color: #64686c;
+				position: relative;
+				top: 3px;
+			}
+			.chat .step .bullet::before {
+			    content: url("data:image/svg+xml; utf8, <svg width='14' height='14' xmlns='http://www.w3.org/2000/svg'><path d='M5.5 8.5L3.5 6.5L2 8L5.5 11.5L12 5L10.5 3.5L5.5 8.5Z' stroke='none' fill='white'/></svg>");
+				position: relative;
+				top: -1px;
 			}
 			.panel .bottom form .input {
 				display: grid;
@@ -387,8 +430,7 @@
 				align-items: center;
 				padding: 0 16px 20px 16px;
 			}
-			.layer-manager .list .polygon::before {
-			    content: url("data:image/svg+xml; utf8, <svg width='24' height='24' xmlns='http://www.w3.org/2000/svg'><g fill='gainsboro'><circle cx='7' cy='5' r='3'/><circle cx='3' cy='19' r='3'/><circle cx='17' cy='19' r='3'/><circle cx='21' cy='5' r='3'/></g><path d='M 7 5 L 3 19 L 17 19 L 21 5 Z' stroke='gainsboro' stroke-width='1.6' fill='none'/></svg>");
+			.layer-manager .list .polygon {
 				position: relative;
 				top: 4px;
 			}
