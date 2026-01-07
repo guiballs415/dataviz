@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+
+	<head>
+	    <meta charset="utf-8">
+		<title>City temperature maps</title>
+
+		<script src="data/temperature-tracts-austin.js"></script>
+		<script src="data/temperature-tracts-baltimore.js"></script>
+		<script src="data/temperature-tracts-boston.js"></script>
+		<script src="data/temperature-tracts-boulder.js"></script>
+		<script src="data/temperature-tracts-colorado-springs.js"></script>
+		<script src="data/temperature-tracts-los-angeles.js"></script>
+		<script src="data/temperature-tracts-miami-dade.js"></script>
+		<script src="data/temperature-tracts-nashville-davidson.js"></script>
+		<script src="data/temperature-tracts-new-york.js"></script>
+		<script src="data/temperature-tracts-phoenix.js"></script>
+		<script src="data/temperature-tracts-san-antonio.js"></script>
+		<script src="data/temperature-tracts-stockton.js"></script>
+		<script src="data/temperature-tracts-tempe.js"></script>
+
+		<script>
+			var cities = [
+				{ city: "Austin", data: city_austin, tweak: { zoom: null, center: [ 0.05, -0.02 ] } },
+				{ city: "Baltimore", data: city_baltimore, tweak: { zoom: null, center: [ 0.01, 0.0 ] } },
+				{ city: "Boston", data: city_boston, tweak: { zoom: null, center: [ 0.015, -0.02 ] } },
+				{ city: "Boulder", data: city_boulder, tweak: { zoom: 1, center: [ 0, -0.015 ] } },
+				{ city: "Colorado Springs", data: city_colorado_springs, tweak: { zoom: null, center: [ 0.02, 0 ] } },
+				{ city: "Los Angeles", data: city_los_angeles, tweak: { zoom: 1, center: [ 0.065, 0 ] } },
+				{ city: "Miami-Dade", data: city_miami_dade, tweak: { zoom: 1, center: [ 0.2, 0.15 ] } },
+				{ city: "Nashville / Davidson", data: city_nashville_davidson, tweak: { zoom: null, center: [ 0.03, 0 ] } },
+				{ city: "New York", data: city_new_york, tweak: { zoom: 1, center: [ 0.04, -0.01 ] } },
+				{ city: "Phoenix", data: city_phoenix, tweak: { zoom: 1, center: null } },
+				{ city: "San Antonio", data: city_san_antonio, tweak: { zoom: 1,  center:  [ 0.05, 0 ] } },
+				{ city: "Stockton", data: city_stockton, tweak: { zoom: null,  center:  [ 0.015, 0 ] } },
+				{ city: "Tempe", data: city_tempe, tweak: { zoom: null,  center:  [ 0.01, 0 ] } },
+			];
+
+			var scale_colors = [
+				"#01665e", "#35978f", "#80cdc1", "#c7eae5", // Dark teal to light seafoam green
+				"#f6e8c3", "#dfc27d", "#bf812d", "#8c510a", // Light beige to dark brown
+			];
+
+			var polygon_style = {
+				fillOpacity: 0.7,
+				strokeColor: "#000000",
+				strokeOpacity: 0.7,
+				strokeWeight: 0.7,
+			};
+
+			var polygon_highlight = {
+				strokeOpacity: 0.8,
+				strokeWeight: 2.5,
+			};
+
+			var polygon_unhighlight = {
+				strokeOpacity: polygon_style.strokeOpacity,
+				strokeWeight: polygon_style.strokeWeight,
+			};
+
+			function mouse_over(city_index, tract_index) {
+
+				var city = cities[city_index];
+				var tract = city.tracts[tract_index];
+
+				for (var i=0 ; i < tract.polygons.length ; i++) {
+					tract.polygons[i].setOptions(polygon_highlight);
+				}
+
+				city.mouse = tract.tract;
+				city.card.textContent = city.city + "\r\n" + tract.tract + "\xa0\xa0\xa0" + tract.t.toFixed(1) + "°C";
+			}
+
+			function mouse_out(city_index, tract_index) {
+
+				var city = cities[city_index];
+				var tract = city.tracts[tract_index];
+
+				for (var i=0 ; i < tract.polygons.length ; i++) {
+					tract.polygons[i].setOptions(polygon_unhighlight);
+				}
+
+				if (tract.tract === city.mouse) {
+					city.mouse = null;
+					city.card.textContent = city.city;
+				}
+			}
+
+			function create_polygons(shapes, bounds=null) {
+
+				var polygons = new Array();
+				var p, u, v, w, i, j, k;
+
+				for (i=0 ; i < shapes.length ; i++) {
+
+					u = new Array();
+					u.push(shapes[i].boundary);
+					for (j=0 ; j < shapes[i].holes.length ; j++) u.push(shapes[i].holes[j]);
+
+					p = new Array();
+					for (j=0 ; j < u.length ; j++) {
+						v = u[j];
+						q = new Array();
+						for (k=0 ; k < v.length ; k++) {
+							w = new google.maps.LatLng(v[k][1], v[k][0]);
+							q.push(w);
+							if (bounds != null) bounds.extend(w);
+						}
+						p.push(q);
+					}
+					if (p.length == 1) p = p[0];
+
+					polygons.push(new google.maps.Polygon({ paths: p }));
+				}
+
+				return polygons;
+			}
+
+			function show_city(city) {
+
+				var temperatures = new Array();
+				var scale_breaks = new Array();
+				var bounds = new google.maps.LatLngBounds();
+				var legend = document.createElement("div");
+				var title = document.createElement("div");
+				var colors = document.createElement("div");
+				var ticks = document.createElement("div");
+				var tract, polygons, div, i, j;
+				var f_over, f_out;
+
+				// Calculate color scale breaks per city
+				for (i=0 ; i < city.data.length ; i++) {
+					tract = city.data[i];
+					tract.t = tract.temperature_6y;
+					if (tract.t == null) tract.t = tract.temperature;
+					if (tract.t != null) temperatures.push(tract.t);
+				}
+				temperatures.sort(function(a, b) { return a-b });
+				for (i=1 ; i < scale_colors.length ; i++) {
+					scale_breaks.push(temperatures[Math.floor(i / scale_colors.length * temperatures.length)]);
+				}
+
+				// Draw polygons per tract
+				city.tracts = new Array();
+				for (i=0 ; i < city.data.length ; i++) {
+
+					// Determine tract's color
+					tract = city.data[i];
+					for (j=0 ; j < scale_breaks.length && tract.t > scale_breaks[j] ; j++) ;
+					polygon_style.fillColor = scale_colors[j];
+
+					f_over = new Function("mouse_over(" + city.index + "," + i + ")");
+					f_out = new Function("mouse_out(" + city.index + "," + i + ")");
+
+					// Draw polygons
+					polygons = create_polygons(tract.shapes, bounds);
+					tract.shapes = null; // Release memory FWIW
+					for (j=0 ; j < polygons.length ; j++) {
+						polygons[j].setOptions(polygon_style);
+						polygons[j].setMap(city.map);
+						polygons[j].addListener("mouseover", f_over);
+						polygons[j].addListener("mouseout", f_out);
+					}
+
+					city.tracts.push({
+						tract: tract.tract,
+						t: tract.t,
+						polygons: polygons
+					});
+				}
+
+				// Draw legend
+				city.div.appendChild(legend);
+				legend.appendChild(title);
+				legend.appendChild(colors);
+				legend.appendChild(ticks);
+				legend.classList.add("legend");
+				title.classList.add("title");
+				colors.classList.add("colors");
+				ticks.classList.add("ticks");
+				title.textContent = "Land surface temperature (°C)";
+				for (i=0 ; i < scale_colors.length ; i++) {
+					div = document.createElement("div");
+					div.style.background = scale_colors[i];
+					div.style.opacity = polygon_style.fillOpacity;
+					colors.appendChild(div);
+					if (i < scale_breaks.length) {
+						div = document.createElement("div");
+						div.textContent = scale_breaks[i].toFixed(1);
+						ticks.appendChild(div);
+					}
+				}
+
+				// Don't show legends until fitBounds() triggers zoom change
+				// (because legends look bad when maps haven't appeared yet)
+				city.legend = legend;
+				legend.classList.add("hide");
+
+				// Set map's center and zoom based on tracts' geometry and then tweak
+				city.is_tweaked = { zoom: false, center: false };
+				city.map.addListener("zoom_changed", function(event) {
+					city.legend.classList.remove("hide");
+					if (city.tweak.zoom == null || city.is_tweaked.zoom) return;
+					city.is_tweaked.zoom = true;
+					city.map.setZoom(city.map.getZoom() + city.tweak.zoom);
+				});
+				city.map.addListener("center_changed", function(event) {
+					if (city.tweak.center == null || city.is_tweaked.center) return;
+					city.is_tweaked.center = true;
+					city.map.setCenter(new google.maps.LatLng(
+						city.map.getCenter().lat() + city.tweak.center[0],
+						city.map.getCenter().lng() + city.tweak.center[1]
+					));
+				});
+				city.map.fitBounds(bounds);
+			}
+
+			function draw() {
+
+				var layout = document.getElementById("layout");
+ 				var city, i;
+
+				for (i=0 ; i < cities.length ; i++) {
+
+					city = cities[i];
+					city.index = i;
+
+					city.div = document.createElement("div");
+					city.div.classList.add("map");
+					layout.appendChild(city.div);
+
+					city.map = new google.maps.Map(city.div, {
+						mapTypeControl: false,
+						streetViewControl: false,
+					});
+
+					city.mouse = null;
+					city.card = document.createElement("div");
+					city.card.textContent = city.city;
+					city.card.classList.add("card");
+					city.div.appendChild(city.card);
+
+					show_city(city);
+				}
+			}
+
+			async function initialize() {
+				const { Map } = await google.maps.importLibrary("maps");
+				draw();
+			}
+
+			// Bootstrap loader (Dynamic Library Import API)
+			(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+				key: "AIzaSyCqHHpYbRdkCj5_gWK6V51ZRuAK__gg1-8",
+				v: "weekly",
+			});
+		</script>
+			
+		<style>
+			.layout {
+				display: flex;
+				flex-wrap: wrap;
+				margin: 20px 40px 60px;
+			}
+			.map {
+				width: 480px;
+				height: 520px;
+				margin: 20px;
+			}
+			.card, .legend {
+				position: absolute;
+				left: 10px;
+				border-radius: 2px;
+				background: white;
+			    filter: drop-shadow(0px 2px 2px rgba(0, 0, 0, 0.3));
+				font-family: "Google Sans", Arial, sans-serif;
+				font-weight: 500;
+				font-size: 12px;
+				line-height: 16px;
+				color: #202124;
+				white-space: pre;
+			}
+			.card {
+				bottom: 10px;
+				padding: 6px 8px;
+			}
+			.legend.hide {
+				display: none;
+			}
+			.legend {
+				top: 10px;
+				padding: 8px 10px;
+			}
+			.legend .title {
+				text-align: center;
+			}
+			.legend .colors {
+				height: 20px;
+				margin: 4px 0;
+				border: 1px solid #dadce0;
+				border-radius: 4px;
+				overflow: hidden;
+			}
+			.legend .colors div {
+				display: inline-block;
+				width: 32px;
+				height: 20px;
+			}
+			.legend .ticks {
+				margin-left: 16px;
+			}
+			.legend .ticks div {
+				display: inline-block;
+				width: 32px;
+				text-align: center;
+			}
+		</style>
+	</head>
+
+	<body onload="initialize()">
+		<div class="layout" id="layout"></div>
+	</body>
+
+</html>
