@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="en">
+
+	<head>
+	    <meta charset="utf-8">
+		<title>Map mocks with circular pins of various sizes with shadows</title>
+
+		<script src="data/states-US.js"></script>
+
+		<script>
+			var initial_seed = 1;
+
+			var spec = {
+				center: { lat: 37.188429, lng: -119.518918 }, // California
+				zoom: 5,
+				dots: {
+					number: [
+						1000,
+						1000,
+						50,
+						50,
+					],
+					color: [
+						"#f538a0", // Pink 500
+						"#e52592", // Pink 600
+						"#24c1e0", // Cyan 500
+						"#12b5cb", // Cyan 600
+					],
+					size: [
+						4,
+						8,
+						12,
+						16,
+					],
+				},
+			};
+
+			var map_styles = [
+				{ featureType: "landscape",
+					stylers: [ { color: "#f1f3f4" } ] },
+				{ featureType: "landscape", elementType: "labels",
+					stylers: [ { visibility: "off" } ] },
+				{ featureType: "water",
+					stylers: [ { color: "#a4e0f1" },  ] },
+				{ featureType: "road",
+					stylers: [ { visibility: "simplified" } ] },
+				{ featureType: "road", elementType: "labels",
+					stylers: [ { visibility: "off" } ] },
+				{ featureType: "road.highway", elementType: "geometry",
+					stylers: [ { color: "#bdc1c6" },  ] },
+				{ featureType: "road.local", elementType: "all",
+					stylers: [ { visibility: "off" } ] },
+				{ featureType: "road.arterial", elementType: "all",
+					stylers: [ { visibility: "off" } ] },
+				{ featureType: "poi",
+					stylers: [ { visibility: "off" } ] },
+				{ featureType: "transit",
+					stylers: [ { visibility: "off" } ] },
+			];
+
+			var california = { polygons: null, bounds: null };
+			var maps = new Array();
+			var view = {
+				center: { lat: spec.center.lat, lng: spec.center.lng },
+				zoom: spec.zoom,
+			};
+			var listeners = new Array();
+			var timer = null;
+
+			// Portable random number generator / Seeded
+			// Pad seed with Phi, Pi and E
+			// https://en.wikipedia.org/wiki/Nothing-up-my-sleeve_number
+			var current_seed = initial_seed ^ 0xDEADBEEF; // 32-bit seed with optional XOR value
+			var random_seeded = sfc32(0x9E3779B9, 0x243F6A88, 0xB7E15162, current_seed);
+
+			function set_seed(new_value) {
+				current_seed = new_value ^ 0xDEADBEEF; // 32-bit seed with optional XOR value
+				random_seeded = sfc32(0x9E3779B9, 0x243F6A88, 0xB7E15162, current_seed);
+			}
+
+			function sfc32(a, b, c, d) {
+			    return function() {
+			      a |= 0; b |= 0; c |= 0; d |= 0; 
+			      var t = (a + b | 0) + d | 0;
+			      d = d + 1 | 0;
+			      a = b ^ b >>> 9;
+			      b = c + (c << 3) | 0;
+			      c = (c << 21 | c >>> 11);
+			      c = c + t | 0;
+			      return (t >>> 0) / 4294967296;
+			    }
+			}
+
+			function create_overlay(location, div, layer=1, redraw=null) {
+
+				class overlayElement extends google.maps.OverlayView {
+					constructor(location, div, layer, redraw) {
+						super();
+						this.location = location;
+						this.div = div;
+						this.layer = layer;
+						this.redraw = redraw;
+						div.classList.add("overlay");
+					}
+					onAdd() {
+						var panes = this.getPanes();
+						var thisPane;
+						if (this.layer == 2) thisPane = panes.markerLayer;
+						else if (this.layer == 3) thisPane = panes.overlayMouseTarget;
+						else thisPane = panes.overlayLayer;
+						thisPane.appendChild(this.div);
+					}
+					onRemove() {
+						if (this.div.parentElement) this.div.parentElement.removeChild(this.div);
+					}
+					draw() {
+						if (this.redraw != null) this.redraw(this)
+						const p = this.getProjection().fromLatLngToDivPixel(this.location);
+						this.div.style.left = p.x + "px";
+						this.div.style.top = p.y + "px";
+					}
+				}
+
+				return new overlayElement(location, div, layer, redraw);
+			}
+
+			function create_dot(location, size, color, redraw=null) {
+
+				var div = document.createElement("div");
+				var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+				var shape = document.createElementNS(svg.namespaceURI, "circle");
+
+				svg.setAttribute("width", size);
+				svg.setAttribute("height", size);
+
+				shape.setAttribute("cx", size/2);
+				shape.setAttribute("cy", size/2);
+				shape.setAttribute("r", size/2);
+				shape.setAttribute("fill", color);
+				shape.setAttribute("stroke", "none");
+				svg.appendChild(shape);
+
+				div.appendChild(svg);
+				div.classList.add("dot");
+
+				return create_overlay(location, div);
+			}
+
+			function get_random_location(bounds, polygons) {
+
+				var pNE = bounds.getNorthEast();
+				var pSW = bounds.getSouthWest();
+				var lat = pSW.lat();
+				var dLat = pNE.lat() - lat;
+				var lng = pSW.lng();
+				var dLng = pNE.lng() - lng;
+				var p, i;
+
+				// Get uniformly distributed point with rectangular bounds
+				// and try again if point is not within polygons
+				do {
+
+					p = new google.maps.LatLng( lat + dLat * random_seeded(), lng + dLng * random_seeded());
+
+					for (i=0 ;
+						i < polygons.length && !google.maps.geometry.poly.containsLocation(p, polygons[i]) ;
+							i++) ;
+
+				} while (i == polygons.length);
+
+				return p;
+			}
+
+			function create_polygons(shapes, bounds=null) {
+
+				var polygons = new Array();
+				var p, u, v, w, i, j, k
+
+				for (i=0 ; i < shapes.length ; i++) {
+
+					u = new Array();
+					u.push(shapes[i].boundary);
+					for (j=0 ; j < shapes[i].holes.length ; j++) u.push(shapes[i].holes[j]);
+
+					p = new Array();
+					for (j=0 ; j < u.length ; j++) {
+						v = u[j];
+						q = new Array();
+						for (k=0 ; k < v.length ; k++) {
+							w = new google.maps.LatLng(v[k][0], v[k][1]);
+							q.push(w);
+							if (bounds != null) bounds.extend(w);
+						}
+						p.push(q);
+					}
+					if (p.length == 1) p = p[0];
+
+					polygons.push(new google.maps.Polygon({ paths: p }));
+				}
+
+				return polygons;
+			}
+
+			function load_california() {
+				var state, i
+				for (i=0 ; (state = states[i]).state !== "California" ; i++) ;
+				california.bounds = new google.maps.LatLngBounds();
+				california.polygons = create_polygons(state.shapes, california.bounds);
+			}
+
+			function add_listeners() {
+				for (var i=0 ; i < maps.length ; i++) {
+					var map = maps[i];
+					var center_listener = google.maps.event.addListener(map, "center_changed", track_view);
+					var zoom_listener = google.maps.event.addListener(map, "zoom_changed", track_view);
+					listeners.push(center_listener);
+					listeners.push(zoom_listener);
+				}
+			}
+
+			function remove_listeners() {
+				for (var i=0 ; i < listeners.length ; i++) google.maps.event.removeListener(listeners[i]);
+				listeners = new Array();
+			}
+
+			function sync_view(zoom, center) {
+
+				clearInterval(timer);
+				timer = null;
+
+				var dcenter_max = 0;
+				var dzoom_max = 0;
+				var dmax_index = null;
+				var map, center, zoom, dlat, dlng, dzoom, i;
+
+				for (i=0 ; i < maps.length ; i++) {
+
+					map = maps[i];
+					center = map.getCenter();
+					zoom = map.getZoom();
+
+					dlat = Math.abs(center.lat() - view.center.lat);
+					dlng = Math.abs(center.lng() - view.center.lng);
+					dzoom = Math.abs(zoom - view.zoom);
+
+					if (dlat > dcenter_max || dlng > dcenter_max || dzoom > dzoom_max) {
+						dcenter_max = Math.max(dlat, dlng);
+						dzoom_max = dzoom;
+						dmax_index = i;
+					}
+				}
+
+				remove_listeners();
+
+				map = maps[dmax_index];
+				center = map.getCenter();
+				zoom = map.getZoom();
+				for (i=0 ; i < maps.length ; i++) {
+					if (i == dmax_index) continue;
+					map = maps[i];
+					map.setCenter(center);
+					map.setZoom(zoom);
+				}
+
+				view.center.lat = center.lat();
+				view.center.lng = center.lng();
+				view.zoom = zoom;
+				add_listeners();
+
+				console.log("center = " + center.lat().toFixed(6) + " , " + center.lng().toFixed(6) + " | zoom = " + zoom);
+			}
+
+			function track_view(event) {
+
+				if (timer != null) {
+					clearInterval(timer);
+					timer = null;
+				}
+
+				timer = setInterval(sync_view);
+			}
+
+			async function initialize() {
+
+				const { Map } = await google.maps.importLibrary("maps");
+				const { geometry } = await google.maps.importLibrary("geometry");
+
+				var layout = document.getElementById("maps");
+ 				var div, map, dot, num_dots, size, color, p, i, j;
+
+				for (i=0 ; i < spec.dots.color.length ; i++) {
+
+					div = document.createElement("div");
+					div.classList.add("map");
+					layout.appendChild(div);
+
+					map = new google.maps.Map(div, {
+						center: spec.center,
+						zoom: spec.zoom,
+						disableDefaultUI: true,
+						gestureHandling: "cooperative",
+						styles: map_styles,
+					});
+
+					maps.push(map);
+				}
+
+				add_listeners();
+
+				load_california();
+				for (i=0 ; i < maps.length ; i++) {
+
+					map = maps[i];
+					num_dots = spec.dots.number[i];
+					size = spec.dots.size[i];
+					color = spec.dots.color[i];
+
+					for (j=0 ; j < num_dots ; j++) {
+						p = get_random_location(california.bounds, california.polygons);
+						dot = create_dot(p, size, color);
+						dot.setMap(map);
+					}
+				}
+			}
+
+			// Bootstrap loader (Dynamic Library Import API)
+			(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+				key: "AIzaSyBso2blH4dR4oYVIBzosWqaN-9pHCVnQ4w",
+    			v: "weekly",
+			});
+		</script>
+
+		<style>
+			.layout {
+				display: flex;
+				flex-wrap: wrap;
+				margin: 20px 40px 60px;
+			}
+			.map {
+				width: 480px;
+				height: 480px;
+				margin-right: 20px;
+				margin-top: 20px;
+			}
+			.overlay {
+				position: absolute;
+				top: 0;
+				left: 0;
+				transform: translate(-50%, -50%);
+			}
+			.dot {
+			    filter: drop-shadow(0px 1px 1px rgba(0, 0, 0, 0.25));
+				pointer-events: none;
+			}
+			.gm-style-cc {
+			    display: none !important;
+			}
+			.gm-style iframe + div { border:none!important; }
+		</style>
+	</head>
+
+	<body onload="initialize()">
+		<div class="layout" id="maps">
+		</div>
+	</body>
+
+</html>
