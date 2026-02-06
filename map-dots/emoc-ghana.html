@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+
+	<head>
+	    <meta charset="utf-8">
+		<title>EmOC map of Ghana</title>
+
+		<script src="data/emoc_ghana_regions.js"></script>
+		<script src="data/emoc_ghana_facilities.js"></script>
+		<script src="data/emoc_ghana_metrics.js"></script>
+
+		<script>
+
+			var scale_num_facilities = {
+
+				title: "Number of facilities\r\nwithin 15 minutes",
+
+				// red, dark, light orange, orange, yellow, light green, dark green
+				colors: [ "#b21412", "#f46d43", "#fdaa65", "#fff057", "#66bd63", "#1b7837" ],
+				numbers: [ 0, 1, 2, 3, 4, 5 ],
+				opacity: 0.6,
+			};
+
+			var polygon_style = {
+				fillOpacity: scale_num_facilities.opacity,
+				strokeColor: "#000000",
+				strokeOpacity: 1,
+				strokeWeight: 2,
+			};
+
+			var track_zoom = {
+				zoom: null,
+				style: null,
+				styles: [ "micro", "small", "medium", "large", "jumbo" ],
+				breaks: [ 8, 10, 12, 14 ],
+			};
+
+			function create_polygons(shapes, bounds=null) {
+
+				var polygons = new Array();
+				var p, u, v, w, i, j, k;
+
+				for (i=0 ; i < shapes.length ; i++) {
+
+					u = new Array();
+					u.push(shapes[i].boundary);
+					for (j=0 ; j < shapes[i].holes.length ; j++) u.push(shapes[i].holes[j]);
+
+					p = new Array();
+					for (j=0 ; j < u.length ; j++) {
+						v = u[j];
+						q = new Array();
+						for (k=0 ; k < v.length ; k++) {
+							w = new google.maps.LatLng(v[k][1], v[k][0]);
+							q.push(w);
+							if (bounds != null) bounds.extend(w);
+						}
+						p.push(q);
+					}
+					if (p.length == 1) p = p[0];
+
+					polygons.push(new google.maps.Polygon({ paths: p }));
+				}
+
+				return polygons;
+			}
+
+			function create_pin(p) {
+
+				class overlay_element extends google.maps.OverlayView {
+					constructor(div, p) {
+						super();
+						this.content = div;
+						this.position = p;
+					}
+					onAdd() {
+						var panes = this.getPanes();
+						var thisPane = panes.floatPane;
+						thisPane = panes.overlayMouseTarget; // level 3
+						thisPane.appendChild(this.content);
+					}
+					onRemove() {
+						if (this.content.parentElement)
+							this.content.parentElement.removeChild(this.content);
+					}
+					draw() {
+						const divPosition = this.getProjection().fromLatLngToDivPixel(this.position);
+						this.content.style.left = divPosition.x + "px";
+						this.content.style.top = divPosition.y + "px";
+					}
+				}
+
+				var div = document.createElement("div");
+				var pin = document.createElement("div");
+
+				div.classList.add("pin-container");
+				pin.classList.add("pin");
+
+				div.appendChild(pin);
+
+				return new overlay_element(div, p);
+			}
+
+			function draw() {
+
+				var map_container = document.getElementById("map");
+				var legend = {
+					container: document.createElement("div"),
+					title: document.createElement("div"),
+					colors: document.createElement("div"),
+					values: document.createElement("div"),
+				};
+				var bounds = new google.maps.LatLngBounds();
+ 				var map, region, facility, options, div, n, i, j;
+
+				map = new google.maps.Map(map_container, {
+					mapTypeControl: false,
+					streetViewControl: false,
+					styles: [
+						{ featureType: "landscape", stylers: [ { color: "#ffffff" } ] },
+						{ featureType: "poi", elementType: "geometry", stylers: [ { color: "#ffffff" } ] },
+					{ featureType: "road",
+						stylers: [ { visibility: "simplified" } ] },
+					{ featureType: "road", elementType: "labels",
+						stylers: [ { visibility: "off" } ] },
+					{ featureType: "road", elementType: "geometry",
+						stylers: [ { color: "#92adca" },  ] },
+					],
+				});
+
+				// Draw choropleth
+				for (i=0 ; i < regions_ghana.length ; i++) {
+
+					region = regions_ghana[i];
+
+					// Link metrics
+					region.metrics = null;
+					for (j=0 ; j < metrics_ghana.length ; j++) {
+						if (metrics_ghana[j].region_code === region.region_code) {
+							region.metrics = metrics_ghana[j];
+							break;
+						}
+					}
+
+					// Determine color
+					if (region.metrics == null) options = { fillOpacity: 0 };
+					else {
+						n = region.metrics.n_within_15;
+						for (j=0 ; j < scale_num_facilities.numbers.length && n > scale_num_facilities.numbers[j] ; j++) ;
+						if (j == scale_num_facilities.numbers.length) j = scale_num_facilities.numbers.length - 1;
+						options = { fillColor: scale_num_facilities.colors[j] };
+					}
+
+					// Display polygons
+					region.polygons = create_polygons(region.shapes, bounds);
+					for (j=0 ; j < region.polygons.length ; j++) {
+						region.polygons[j].setOptions(polygon_style);
+						region.polygons[j].setOptions(options);
+						region.polygons[j].setMap(map);
+					}
+				}
+
+				map.fitBounds(bounds, 0);
+
+				// Draw legend
+				legend.container.classList.add("legend");
+				map_container.appendChild(legend.container);
+
+				legend.title.classList.add("title");
+				legend.title.textContent = scale_num_facilities.title;
+				legend.container.appendChild(legend.title);
+
+				legend.colors.classList.add("colors");
+				legend.container.appendChild(legend.colors);
+
+				legend.values.classList.add("values");
+				legend.container.appendChild(legend.values);
+
+				for (i=0 ; i < scale_num_facilities.colors.length ; i++) {
+
+					div = document.createElement("div");
+					div.style.background = scale_num_facilities.colors[i];
+					div.style.opacity = scale_num_facilities.opacity;
+					legend.colors.appendChild(div);
+
+					div = document.createElement("div");
+					div.textContent = scale_num_facilities.numbers[i] + (i+1 < scale_num_facilities.colors.length ? "" : "+");
+					legend.values.appendChild(div);
+				}
+
+				// Add pins
+				facilities_ghana.sort(function(a, b) { return b.location.lat-a.location.lat; });
+				for (i=0 ; i < facilities_ghana.length ; i++) {
+					facility = facilities_ghana[i];
+					facility.pin = create_pin(new google.maps.LatLng(facility.location));
+					facility.pin.setMap(map);
+				}
+
+				map.addListener("zoom_changed", function(event) {
+
+					var zoom, style, i;
+
+					zoom = map.getZoom();
+					if (track_zoom.zoom == zoom) return;
+
+					for (i=0 ; i < track_zoom.breaks.length && zoom >= track_zoom.breaks[i] ; i++) ;
+					style = track_zoom.styles[i];
+					if (style != track_zoom.style) {
+						for (i=0 ; i < facilities_ghana.length ; i++) {
+							facility = facilities_ghana[i];
+							if (track_zoom.style != null) facility.pin.content.classList.remove(track_zoom.style);
+							facility.pin.content.classList.add(style);
+						}
+					}
+
+					track_zoom.zoom = zoom;
+					track_zoom.style = style;
+				});
+			}
+
+			async function initialize() {
+				const { Map } = await google.maps.importLibrary("maps");
+				draw();
+			}
+
+			// Bootstrap loader (Dynamic Library Import API)
+			(g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+				key: "AIzaSyCqHHpYbRdkCj5_gWK6V51ZRuAK__gg1-8",
+    			v: "weekly",
+			});
+		</script>
+			
+		<style>
+			:root {
+				box-sizing: border-box;
+			}
+			* {
+				box-sizing: inherit;
+			}
+			body {
+				margin: 0px;
+			}
+			.map {
+				width: 100vw;
+				height: 100vh;
+			}
+			.legend {
+				position: absolute;
+				top: 12px;
+				left: 12px;
+				padding: 8px 10px;
+				border-radius: 2px;
+				background: white;
+				border: 1px solid #e8eaed;
+			    filter: drop-shadow(0px 2px 2px rgba(0, 0, 0, 0.3));
+				font-family: "Google Sans", Arial, sans-serif;
+				font-weight: 500;
+				font-size: 13px;
+				line-height: 16px;
+				color: #202124;
+				white-space: pre;
+			}
+			.legend .title {
+				text-align: center;
+				margin-bottom: 6px;
+			}
+			.legend .colors {
+				height: 20px;
+				margin: 4px 0;
+				border: 1px solid #dadce0;
+				border-radius: 4px;
+				overflow: hidden;
+			}
+			.legend .colors div, .legend .values div {
+				display: inline-block;
+				width: 32px;
+			}
+			.legend .colors div {
+				height: 20px;
+			}
+			.legend .values div {
+				text-align: center;
+			}
+			.pin-container.jumbo, .pin-container.jumbo .pin {
+				width: 20px;
+				height: 20px;
+				border-radius: 10px;
+			}
+			.pin-container.large, .pin-container.large .pin {
+				width: 16px;
+				height: 16px;
+				border-radius: 8px;
+			}
+			.pin-container.medium, .pin-container.medium .pin {
+				width: 12px;
+				height: 12px;
+				border-radius: 6px;
+			}
+			.pin-container.small, .pin-container.small .pin {
+				width: 10px;
+				height: 10px;
+				border-radius: 5px;
+			}
+			.pin-container.micro, .pin-container.micro .pin {
+				width: 8px;
+				height: 8px;
+				border-radius: 4px;
+			}
+			.pin-container {
+				position: absolute;
+				left: 0;
+				top: 0;
+				transform: translate(-50%, -50%);
+				cursor: pointer;
+			}
+			.pin-container .pin {
+				border: 2px solid #ffffff;
+				background-color: #9334e6;
+			    filter: drop-shadow(0px 2px 2px rgba(0, 0, 0, 0.5));
+			}
+			.pin-container.small .pin, .pin-container.micro .pin {
+				border: 1px solid #ffffff;
+			}
+			.pin-container:hover .pin {
+				transform: scale(1.4, 1.4);
+			    filter: drop-shadow(0px 3px 3px rgba(0, 0, 0, 0.5));
+			}
+			.gm-style-cc {
+			    display: none !important;
+			}
+			.gm-style iframe + div { border:none!important; }
+		</style>
+	</head>
+
+	<body onload="initialize()">
+		<div class="map" id="map">
+		</div>
+	</body>
+
+</html>
